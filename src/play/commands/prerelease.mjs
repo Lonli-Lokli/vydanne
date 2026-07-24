@@ -46,10 +46,22 @@ export async function run(config, client) {
 
   const editId = await client.newEdit();
   try {
-    const bundle = await client.uploadBundle(editId, aab);
-    const versionCode = bundle.versionCode;
-    if (!versionCode) throw new Error(`upload returned no versionCode: ${JSON.stringify(bundle).slice(0, 200)}`);
-    console.log(green(`  uploaded versionCode ${versionCode}`));
+    // Upload, or REUSE. Play rejects a versionCode it already holds, which is the right answer for an
+    // accidental re-upload but wrong for the common case of promoting a build you already pushed to one
+    // testing track onto another. The API names the code in its refusal, so take it and carry on — the
+    // bytes are already up there, and a bundle is immutable, so reusing it can't diverge from the file.
+    let versionCode;
+    try {
+      const bundle = await client.uploadBundle(editId, aab);
+      versionCode = bundle.versionCode;
+      if (!versionCode) throw new Error(`upload returned no versionCode: ${JSON.stringify(bundle).slice(0, 200)}`);
+      console.log(green(`  uploaded versionCode ${versionCode}`));
+    } catch (e) {
+      const used = /Version code (\d+) has already been used/.exec(e.message);
+      if (!used) throw e;
+      versionCode = Number(used[1]);
+      console.log(yellow(`  versionCode ${versionCode} already uploaded — reusing that bundle`));
+    }
 
     const releaseNotes = readNotes(g.metadataDir, versionCode, g.defaultLocale);
     if (releaseNotes.length) {

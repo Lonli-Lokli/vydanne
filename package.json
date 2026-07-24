@@ -45,7 +45,8 @@
     "types/index.d.ts",
     "SKILL.md",
     "vydanne.config.example.mjs",
-    "README.md"
+    "README.md",
+    "GETTING_STARTED.md"
   ],
   "scripts": {
     "check:docs": "node scripts/check-docs.mjs",

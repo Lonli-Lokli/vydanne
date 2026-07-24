@@ -1,0 +1,9 @@
+node_modules/
+
+# Local run output — vydanne writes the export-compliance PDF and the flattened IAP/screenshot PNGs
+# next to where it was invoked. Those are per-app artefacts, never the tool's.
+*.pdf
+*-flat.png
+
+*.log
+.DS_Store

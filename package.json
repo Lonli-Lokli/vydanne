@@ -1,0 +1,65 @@
+{
+  "name": "vydanne",
+  "version": "0.1.0",
+  "description": "App Store Connect + Google Play submission prep — the companion to zdymak (media). Native Node (no fastlane/Ruby/Python): localized listings, screenshot/preview/icon upload, ratings, review contact, accessibility & privacy labels, IAP, export docs, a diff of local-vs-store, and a preflight verifier that encodes the store gotchas. iOS/macOS via the ASC REST API; Android via the Play Developer Edits API (--store google).",
+  "keywords": [
+    "app-store-connect",
+    "google-play",
+    "aso",
+    "ios",
+    "android",
+    "app-store",
+    "play-developer-api",
+    "fastlane-alternative",
+    "app-metadata",
+    "screenshots",
+    "app-preview",
+    "publishing"
+  ],
+  "type": "module",
+  "main": "src/index.mjs",
+  "types": "./types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "default": "./src/index.mjs"
+    }
+  },
+  "bin": {
+    "vydanne": "bin/vydanne.mjs"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "license": "MIT",
+  "author": "Lonli-Lokli <lonli.lokli@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Lonli-Lokli/vydanne.git"
+  },
+  "homepage": "https://github.com/Lonli-Lokli/vydanne#readme",
+  "bugs": "https://github.com/Lonli-Lokli/vydanne/issues",
+  "files": [
+    "bin",
+    "src",
+    "types/index.d.ts",
+    "SKILL.md",
+    "vydanne.config.example.mjs",
+    "README.md"
+  ],
+  "scripts": {
+    "check:docs": "node scripts/check-docs.mjs",
+    "check:types": "tsc --noEmit -p tsconfig.json && node scripts/check-types.mjs",
+    "prepublishOnly": "npm run check:docs && npm run check:types",
+    "release:patch": "node scripts/release.mjs patch",
+    "release:minor": "node scripts/release.mjs minor",
+    "release:major": "node scripts/release.mjs major"
+  },
+  "dependencies": {
+    "pdfkit": "^0.15.0",
+    "sharp": "^0.35.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

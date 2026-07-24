@@ -57,6 +57,7 @@
     "release:major": "node scripts/release.mjs major"
   },
   "dependencies": {
+    "dotenv": "^17.4.2",
     "pdfkit": "^0.15.0",
     "sharp": "^0.35.3"
   },

@@ -22,14 +22,33 @@ Play images (below), so the two line up with no glue.
 path in it resolve against the working directory. Running from a subfolder silently reads the wrong paths.
 
 One `vydanne.config.mjs` per app (schema: `vydanne.config.example.mjs`; type
-`import('vydanne').VydanneConfig`). Auth: `~/.appstoreconnect/private_keys/AuthKey_<keyId>.p8` +
-`ASC_KEY_ID` / `ASC_ISSUER_ID`; Play uses `PLAY_JSON_KEY_FILE`. Node ≥20.9. Cross-platform — the key path
-resolves via `os.homedir()`, so it works on Windows (`C:\Users\<you>\.appstoreconnect\…`). On Windows
-PowerShell the `VAR=1 cmd` form does **not** exist; set `$env:VAR = "1"` first.
+`import('vydanne').VydanneConfig`). Node ≥20.9. Cross-platform. On Windows PowerShell the `VAR=1 cmd`
+form does **not** exist; set `$env:VAR = "1"` first.
+
+**Auth resolves automatically — NEVER put credentials in the config.** That file is committed; vydanne
+refuses a keyId/issuerId found there and warns. The signing key stays at
+`~/.appstoreconnect/private_keys/AuthKey_<keyId>.p8`. The ids resolve highest-priority-first from: the
+environment (`ASC_KEY_ID` / `ASC_ISSUER_ID` / `PLAY_JSON_KEY_FILE`) → the **`.env` cascade** → the **user
+config file**.
+
+The cascade is the standard one (dotenv-parsed, later file wins): `.env` → `.env.<mode>` → `.env.local` →
+`.env.<mode>.local`, `mode` from `VYDANNE_ENV`/`NODE_ENV`. So `.env` and `.env.<mode>` stay COMMITTABLE
+for shared non-secret defaults and only `*.local` holds secrets — never tell a user to gitignore `.env`
+itself. Files are parsed, never merged into `process.env`, so a real env var always wins.
+
+The user config file is the answer for a portfolio: write `{"keyId","issuerId","playJsonKeyFile"}` once
+and every app picks it up with no per-repo setup. Looked up first-hit-wins —
+`$VYDANNE_CONFIG_HOME/config.json` → `%APPDATA%\vydanne\config.json` (Windows) or
+`$XDG_CONFIG_HOME/vydanne/config.json` (default `~/.config/vydanne/`) → `~/.appstoreconnect/config.json`
+(beside the keys, where Apple's tooling and fastlane already keep the `.p8`). Several accounts → named
+`profiles` + `VYDANNE_PROFILE`, or pin one per app with `asc: {profile}` (a label, not a secret).
+**Run `vydanne auth` before debugging any 401** — it prints what resolved, from which source, masked,
+which user file was used, and whether the `.p8` is on disk.
 
 **Config fields:** `bundleId` · `primaryLocale` (the fallback — must be populated) · `asc` (optional
-`{keyId, issuerId}`) · `platforms` (iOS and macOS are SEPARATE) · `uiLocales` (auto-mapped to ASC codes) ·
-`metadataDir` · `rating` · `privacy` · `iaps` · `previews` · `export` · `google` (Google Play).
+`{profile}` — selection only, never secrets) · `platforms` (iOS and macOS are SEPARATE) · `uiLocales`
+(auto-mapped to ASC codes) · `metadataDir` · `rating` · `privacy` · `iaps` · `previews` · `export` ·
+`google` (Google Play).
 
 For a non-technical user asking how to set this up from scratch, walk them through
 **`GETTING_STARTED.md`** (accounts → API key → config → folders → push) rather than improvising.
@@ -143,7 +162,7 @@ who it's for → honest close. Keep it scannable; lead each bullet with the payo
 `previews` (App Preview videos) · `age-rating` · `review-contact` · `accessibility` (draft; publish once
 live) · `privacy` (prints answers for the UI — the API can't reach Apple's iris host) · `iap` (validate +
 RGB flatten) · `compliance` (US self-classification PDF) · `diff` (what differs vs live) · `preflight`
-(completeness gate) · `inspect` · `locales` · `version`.
+(completeness gate) · `inspect` · `auth` (what credentials resolved, and from where) · `locales` · `version`.
 
 `--store google` routes `inspect` · `diff` · `preflight` · `fill` to the Play Developer **Edits** API
 (OAuth2 service account; **scoped to the config's `packageName`** — a shared key can't touch another app).

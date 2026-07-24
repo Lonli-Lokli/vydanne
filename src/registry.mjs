@@ -25,5 +25,5 @@ export const PLAY_COMMANDS = {
   fill: { mod: "fill" },
 };
 
-// Full public command surface (the module-dispatched ones above + the two handled inline in bin/).
-export const COMMAND_NAMES = [...Object.keys(COMMANDS), "locales", "version"];
+// Full public command surface (the module-dispatched ones above + the three handled inline in bin/).
+export const COMMAND_NAMES = [...Object.keys(COMMANDS), "auth", "locales", "version"];

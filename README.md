@@ -67,14 +67,66 @@ Download the `.p8` (once only!), then:
 ```sh
 mkdir -p ~/.appstoreconnect/private_keys
 mv ~/Downloads/AuthKey_*.p8 ~/.appstoreconnect/private_keys/
-export ASC_KEY_ID=…  ASC_ISSUER_ID=…
+
+# Write the ids ONCE — every app you ship reads them from here. Nothing to export per shell,
+# nothing secret in any repo. (The .p8 stays next to it, in private_keys/.)
+cat > ~/.appstoreconnect/config.json <<'JSON'
+{ "keyId": "ABCD123456", "issuerId": "69a6de70-…" }
+JSON
+chmod 600 ~/.appstoreconnect/config.json
+
+npx vydanne auth      # confirms what resolved, and from where
 ```
 ```powershell
 # Windows PowerShell
 New-Item -ItemType Directory -Force "$env:USERPROFILE\.appstoreconnect\private_keys"
 Move-Item "$env:USERPROFILE\Downloads\AuthKey_*.p8" "$env:USERPROFILE\.appstoreconnect\private_keys\"
-$env:ASC_KEY_ID = "…"; $env:ASC_ISSUER_ID = "…"
+'{ "keyId": "ABCD123456", "issuerId": "69a6de70-…" }' |
+  Set-Content "$env:USERPROFILE\.appstoreconnect\config.json"
 ```
+
+### Where credentials come from
+
+Resolved automatically, highest priority first — and **never** from `vydanne.config.mjs`, which is
+committed. A keyId or issuerId found there is refused at load, with a warning telling you to move it:
+
+| Source | Use it for |
+|---|---|
+| `ASC_KEY_ID` / `ASC_ISSUER_ID` / `PLAY_JSON_KEY_FILE` in the environment | CI secrets, one-off overrides |
+| the `.env` cascade in the repo | one app that needs a different account from the rest |
+| **the user config file** | **the default for every app you ship** — one account, many repos |
+
+**The `.env` cascade** is the standard one (same shape Vite and Next.js use), parsed with `dotenv`, later
+file wins: `.env` → `.env.<mode>` → `.env.local` → `.env.<mode>.local`, where `mode` is `VYDANNE_ENV` (or
+`NODE_ENV`) and is optional. So `.env` and `.env.<mode>` stay **committable** for shared non-secret
+defaults, and only the `*.local` files hold secrets — those are the ones to gitignore:
+
+```gitignore
+.env.local
+.env.*.local
+```
+
+Values are *parsed*, never loaded into `process.env`, so a real environment variable always wins.
+
+**The user config file** is looked up in this order, first hit wins — there is no single cross-platform
+home for it, so all three are honoured instead of forcing one on everyone:
+
+| Path | |
+|---|---|
+| `$VYDANNE_CONFIG_HOME/config.json` | explicit escape hatch (a secrets mount, a shared drive, tests) |
+| `%APPDATA%\vydanne\config.json` (Windows)<br>`$XDG_CONFIG_HOME/vydanne/config.json` → `~/.config/vydanne/config.json` | what a Windows or Linux user expects |
+| `~/.appstoreconnect/config.json` | beside the keys — Apple's tooling and fastlane already keep the `.p8` in `~/.appstoreconnect/private_keys` on every platform |
+
+Shipping under more than one account? Use named profiles, selected with `VYDANNE_PROFILE=client-x` or
+pinned per app via `asc: { profile: "client-x" }` in its config — a label, not a secret:
+
+```json
+{ "default": "kupalinka",
+  "profiles": { "kupalinka": { "keyId": "…", "issuerId": "…", "playJsonKeyFile": "~/.config/play/sa.json" },
+                "client-x":  { "keyId": "…", "issuerId": "…" } } }
+```
+
+`vydanne auth` prints what resolved and which source won, masked — run it first when Apple returns a 401.
 
 **2. Describe your app** in a `vydanne.config.mjs` file next to your project:
 

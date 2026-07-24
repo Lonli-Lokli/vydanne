@@ -16,6 +16,7 @@ export type CommandName =
   | 'inspect'
   | 'diff'
   | 'preflight'
+  | 'auth'
   | 'locales'
   | 'version';
 
@@ -74,8 +75,12 @@ export interface VydanneConfig {
   bundleId: string;
   /** Fallback for every locale without its own listing — must be populated. */
   primaryLocale: string;
-  /** Prefer ASC_KEY_ID / ASC_ISSUER_ID env over putting these in the config. */
-  asc?: { keyId?: string; issuerId?: string };
+  /**
+   * Credential SELECTION only — never credentials. This file is committed, so a keyId/issuerId here is
+   * refused at load with a warning. Values resolve from the environment, a gitignored `.env`, or
+   * `~/.appstoreconnect/config.json`. `profile` picks one entry when that file uses named profiles.
+   */
+  asc?: { profile?: string };
   /** iOS and macOS are separate ASC platforms. */
   platforms?: Platform[];
   /** App UI locales; mapped to ASC codes (unsupported ones fall back to primary). */

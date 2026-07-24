@@ -10,11 +10,44 @@ const INFO_TXT = { name: "name", subtitle: "subtitle" };
 const IOS_DEVICE = { iphone69: "APP_IPHONE_67", iphone65: "APP_IPHONE_65", ipad13: "APP_IPAD_PRO_3GEN_129", watch: "APP_WATCH_ULTRA" };
 const MAC_DEVICE = { macos: "APP_DESKTOP" };
 
+/**
+ * PATCH a localization, surviving attributes Apple refuses to edit RIGHT NOW.
+ *
+ * A version-localization PATCH is all-or-nothing: one un-editable attribute rejects the WHOLE payload
+ * with 409 STATE_ERROR and nothing is written. The classic case is `whatsNew` on a first version — there
+ * is no previous release, so "What's New" cannot exist, and sending it silently costs you the
+ * description and keywords for every locale.
+ *
+ * So: send everything, and if Apple names offending attributes, drop exactly those and retry once. Any
+ * other failure is reported rather than swallowed — a fill that writes nothing must never look like a
+ * fill that worked.
+ */
+async function patchAttrs(client, url, type, id, attrs, label) {
+  const send = (a) => client.patch(url, { data: { type, id, attributes: a } });
+  let res = await send(attrs);
+  if (res.status < 300) return { ok: true, dropped: [] };
+
+  // "Attribute 'whatsNew' cannot be edited at this time" → drop the named attributes and retry.
+  const blocked = (res.json?.errors || [])
+    .flatMap((e) => [...String(e.detail || "").matchAll(/Attribute '([^']+)' cannot be edited/g)].map((m) => m[1]))
+    .filter((k) => k in attrs);
+  if (blocked.length) {
+    const rest = Object.fromEntries(Object.entries(attrs).filter(([k]) => !blocked.includes(k)));
+    if (!Object.keys(rest).length) return { ok: true, dropped: blocked };
+    res = await send(rest);
+    if (res.status < 300) return { ok: true, dropped: blocked };
+  }
+  const why = (res.json?.errors || []).map((e) => `${e.code || res.status}: ${e.detail || e.title}`).join("; ") || `HTTP ${res.status}`;
+  console.error(red(`    ✗ ${label}: ${why}`));
+  return { ok: false, dropped: [] };
+}
+
 // Push metadata (native PATCH — works at any editable state, incl. READY_FOR_REVIEW, unlike deliver) +
 // screenshots (native chunked upload; skips sets that already have shots so it never duplicates).
 // iOS and macOS are separate platforms. Toggles: VYDANNE_SKIP_METADATA / VYDANNE_SKIP_SCREENSHOTS.
 export async function run(config, client) {
   await client.findApp(config.bundleId);
+  let ok = true; // a locale Apple refused must fail the command, not just print
   const skipMeta = process.env.VYDANNE_SKIP_METADATA === "1";
   const skipShots = process.env.VYDANNE_SKIP_SCREENSHOTS === "1";
   const info = await client.appInfo();
@@ -27,6 +60,8 @@ export async function run(config, client) {
     const verLocs = await client.versionLocalizations(v.id);
 
     if (!skipMeta) {
+      let failed = 0;
+      const dropped = new Set();
       const dirs = fs.readdirSync(config.metadataDir, { withFileTypes: true }).filter((d) => d.isDirectory() && VALID.has(d.name)).map((d) => d.name);
       for (const code of dirs) {
         const folder = path.join(config.metadataDir, code);
@@ -36,7 +71,11 @@ export async function run(config, client) {
         if (!vl) { const c = await client.post(`/v1/appStoreVersionLocalizations`, { data: { type: "appStoreVersionLocalizations", attributes: { locale: code }, relationships: { appStoreVersion: { data: { type: "appStoreVersions", id: v.id } } } } }); vl = c.json.data; verLocs.push(vl); }
         const vattrs = {};
         for (const [k, f] of Object.entries(VERSION_TXT)) { const t = read(f); if (t != null) vattrs[k] = t; }
-        if (Object.keys(vattrs).length) await client.patch(`/v1/appStoreVersionLocalizations/${vl.id}`, { data: { type: "appStoreVersionLocalizations", id: vl.id, attributes: vattrs } });
+        if (Object.keys(vattrs).length) {
+          const r = await patchAttrs(client, `/v1/appStoreVersionLocalizations/${vl.id}`, "appStoreVersionLocalizations", vl.id, vattrs, `${code} version`);
+          if (!r.ok) failed++;
+          for (const d of r.dropped) dropped.add(d);
+        }
         // app-info localization (name/subtitle — shared across platforms). Apple REQUIRES `name` when
         // CREATING a localization (409 ATTRIBUTE.REQUIRED otherwise), so build the attrs first and send
         // them in the POST; only PATCH when the localization already exists.
@@ -50,16 +89,20 @@ export async function run(config, client) {
             if (il) infoLocs.push(il);
             else console.error(`  appInfo ${code}: create failed — ${JSON.stringify(c.json?.errors?.[0]?.detail || c.json)}`);
           } else if (Object.keys(iattrs).length) {
-            await client.patch(`/v1/appInfoLocalizations/${il.id}`, { data: { type: "appInfoLocalizations", id: il.id, attributes: iattrs } });
+            const r = await patchAttrs(client, `/v1/appInfoLocalizations/${il.id}`, "appInfoLocalizations", il.id, iattrs, `${code} app-info`);
+            if (!r.ok) failed++;
+            for (const d of r.dropped) dropped.add(d);
           }
         }
       }
-      console.log(green(`  metadata: ${dirs.length} locales`));
+      if (dropped.size) console.log(yellow(`  skipped un-editable attribute(s) in this version state: ${[...dropped].join(", ")}`));
+      console.log(failed ? red(`  metadata: ${dirs.length - failed}/${dirs.length} locales written, ${failed} FAILED`) : green(`  metadata: ${dirs.length} locales`));
+      if (failed) ok = false;
     }
 
     if (!skipShots) await uploadScreenshots(config, client, platform, verLocs);
   }
-  return true;
+  return ok;
 }
 
 async function uploadScreenshots(config, client, platform, verLocs) {

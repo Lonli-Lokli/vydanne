@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { loadConfig } from "../src/config.mjs";
 import { Client } from "../src/client.mjs";
 import { COMMANDS, PLAY_COMMANDS } from "../src/registry.mjs";
@@ -16,6 +18,30 @@ const store = si >= 0 ? argv[si + 1] : "apple";
 try {
   if (["version", "-v", "--version"].includes(cmd)) {
     console.log(`vydanne ${VERSION}`);
+  } else if (cmd === "auth") {
+    // "Why isn't it picking up my key?" — answered, without ever printing a secret.
+    const cr = (await loadConfig(cfgPath)).credentials;
+    const mask = (v) => (v ? `${String(v).slice(0, 4)}…${String(v).slice(-4)}` : null);
+    const row = (label, value, key, shown) =>
+      console.log(value
+        ? `  \x1b[32m✓\x1b[0m ${label.padEnd(20)} ${String(shown ?? mask(value)).padEnd(26)} ← ${cr.sources[key]}`
+        : `  \x1b[31m✗\x1b[0m ${label.padEnd(20)} \x1b[31mnot found\x1b[0m`);
+    console.log("Credentials — environment > .env cascade > user config (never the committed config):");
+    row("ASC_KEY_ID", cr.keyId, "ASC_KEY_ID", cr.keyId);
+    row("ASC_ISSUER_ID", cr.issuerId, "ASC_ISSUER_ID");
+    row("PLAY_JSON_KEY_FILE", cr.playJsonKeyFile, "PLAY_JSON_KEY_FILE", cr.playJsonKeyFile);
+    if (cr.keyId) {
+      const p = path.join(os.homedir(), ".appstoreconnect", "private_keys", `AuthKey_${cr.keyId}.p8`);
+      console.log(existsSync(p)
+        ? `  \x1b[32m✓\x1b[0m ${"signing key".padEnd(20)} ${p}`
+        : `  \x1b[31m✗\x1b[0m ${"signing key".padEnd(20)} \x1b[31mmissing\x1b[0m — ${p}`);
+    }
+    console.log(cr.userFile ? `\nuser config: ${cr.userFile}` : `\nuser config: none found. Looked in:\n${cr.candidates.map((c) => `  ${c}`).join("\n")}`);
+    if (!cr.keyId || !cr.issuerId) {
+      const target = cr.userFile || cr.candidates[cr.candidates.length - 1];
+      console.log(`\nSet once for EVERY app, no secrets in any repo:\n  ${target}\n  { "keyId": "ABCD123456", "issuerId": "69a6de70-…" }\n  chmod 600 ${target}`);
+      process.exit(1);
+    }
   } else if (cmd === "locales") {
     const r = (await loadConfig(cfgPath)).resolvedLocales;
     console.log(`supported (${Object.keys(r.supported).length}):`);
@@ -62,5 +88,10 @@ usage: vydanne <command> [--config vydanne.config.mjs]
   diff            show what differs between local (metadata/screenshots/previews) and ASC
   preflight       verify submission-completeness (the gotcha checker)
   locales         UI -> ASC locale mapping + unsupported
-toggles: VYDANNE_SKIP_METADATA / VYDANNE_SKIP_SCREENSHOTS (fill), VYDANNE_A11Y_PUBLISH (accessibility)`;
+  auth            which credentials resolved, and from where (masked) — run this on a 401
+credentials: env > .env cascade (.env, .env.<mode>, .env.local, .env.<mode>.local) > user config
+  (\$VYDANNE_CONFIG_HOME, %APPDATA%\\vydanne or \$XDG_CONFIG_HOME/vydanne, ~/.appstoreconnect).
+  NEVER the committed vydanne.config.mjs — run \`vydanne auth\` to see what resolved.
+toggles: VYDANNE_SKIP_METADATA / VYDANNE_SKIP_SCREENSHOTS (fill), VYDANNE_A11Y_PUBLISH (accessibility),
+         VYDANNE_PROFILE (named profile), VYDANNE_ENV (.env mode)`;
 }

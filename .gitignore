@@ -7,3 +7,9 @@ node_modules/
 
 *.log
 .DS_Store
+
+# Credentials. vydanne reads the standard .env cascade, so `.env` / `.env.<mode>` stay COMMITTABLE for
+# shared non-secret defaults and only the `*.local` files — where secrets actually go — are ignored.
+# The account-level default lives outside every repo (see `vydanne auth`).
+.env.local
+.env.*.local

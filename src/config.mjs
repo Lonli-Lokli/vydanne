@@ -45,6 +45,9 @@ export async function loadConfig(p) {
           serviceAccountKey: creds.playJsonKeyFile,
           metadataDir: raw.google.metadataDir || "fastlane/metadata/android",
           defaultLocale: raw.google.defaultLocale || raw.primaryLocale,
+          aab: raw.google.aab || null,
+          track: raw.google.track || "internal", // testing only — `prerelease` refuses production
+
         }
       : null,
   };

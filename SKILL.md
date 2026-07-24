@@ -164,7 +164,17 @@ live) · `privacy` (prints answers for the UI — the API can't reach Apple's ir
 RGB flatten) · `compliance` (US self-classification PDF) · `diff` (what differs vs live) · `preflight`
 (completeness gate) · `inspect` · `auth` (what credentials resolved, and from where) · `locales` · `version`.
 
-`--store google` routes `inspect` · `diff` · `preflight` · `fill` to the Play Developer **Edits** API
+`prerelease` (**Play only**) uploads an `.aab` to a **closed testing track** with release notes, inside one
+edit transaction. `production` is REFUSED — not flag-gated — so no argument combination ships to the
+public; promoting the tested build stays a human's job, mirroring the Apple side never submitting. Track
+comes from `google.track` / `VYDANNE_TRACK`, default `internal`; the bundle from `google.aab` /
+`VYDANNE_AAB` (a directory takes its newest `.aab`). **For a PAID app use `internal`** — it's the only
+track where testers install without buying. Notes follow supply's layout:
+`<google.metadataDir>/<play-locale>/changelogs/<versionCode>.txt`, falling back to `default.txt`, capped
+at Play's 500 chars. DRY by default like `fill --store google`; `VYDANNE_COMMIT=1` publishes. The
+versionCode comes from the bundle itself, so re-uploading one fails loudly instead of silently replacing.
+
+`--store google` routes `inspect` · `diff` · `preflight` · `fill` · `prerelease` to the Play Developer **Edits** API
 (OAuth2 service account; **scoped to the config's `packageName`** — a shared key can't touch another app).
 `fill --store google` is **DRY by default**; `VYDANNE_COMMIT=1` commits. The AAB binary and the
 (YouTube-URL) promo video stay outside vydanne.

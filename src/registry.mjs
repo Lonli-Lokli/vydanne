@@ -23,7 +23,8 @@ export const PLAY_COMMANDS = {
   preflight: { mod: "preflight" },
   diff: { mod: "diff" },
   fill: { mod: "fill" },
+  prerelease: { mod: "prerelease" },
 };
 
 // Full public command surface (the module-dispatched ones above + the three handled inline in bin/).
-export const COMMAND_NAMES = [...Object.keys(COMMANDS), "auth", "locales", "version"];
+export const COMMAND_NAMES = [...Object.keys(COMMANDS), "prerelease", "auth", "locales", "version"];

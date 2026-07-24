@@ -87,6 +87,7 @@ usage: vydanne <command> [--config vydanne.config.mjs]
   inspect         read-only ASC state
   diff            show what differs between local (metadata/screenshots/previews) and ASC
   preflight       verify submission-completeness (the gotcha checker)
+  prerelease      --store google: upload the .aab to a closed testing track (refuses production)
   locales         UI -> ASC locale mapping + unsupported
   auth            which credentials resolved, and from where (masked) — run this on a 401
 credentials: env > .env cascade (.env, .env.<mode>, .env.local, .env.<mode>.local) > user config

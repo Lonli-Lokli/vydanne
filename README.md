@@ -180,7 +180,7 @@ Run vydanne **from your project folder** — it finds everything relative to whe
 | `compliance` | Generates the US encryption self-classification PDF that Apple asks for. |
 | `version` | Prints the version of vydanne. |
 
-For **Google Play**, add `--store google` to `inspect`, `diff`, `preflight`, or `fill`.
+For **Google Play**, add `--store google` to `inspect`, `diff`, `preflight`, `fill`, or `prerelease`.
 
 <br>
 
@@ -195,6 +195,37 @@ npx vydanne fill --store google                    # dry run — shows what woul
 VYDANNE_COMMIT=1 npx vydanne fill --store google   # actually do it
 #   Windows PowerShell:  $env:VYDANNE_COMMIT = "1"; npx vydanne fill --store google
 ```
+
+### `prerelease` — the build, to a testing track
+
+`fill` writes the *listing*; `prerelease` uploads the **binary** to a **closed testing track** with
+release notes, all inside one edit transaction:
+
+```sh
+npx vydanne prerelease --store google                    # dry run
+VYDANNE_COMMIT=1 npx vydanne prerelease --store google   # publish to the track
+```
+
+```js
+google: {
+  packageName: "com.x.app",
+  aab: "./dist",        // a file, or a directory whose NEWEST .aab is taken
+  track: "internal",    // 'internal' (default) | 'alpha' | 'beta'
+}
+```
+
+**It refuses `production`** — that isn't a flag you can pass, it's a refusal. A staged rollout can be
+halted but never un-shipped, so promoting a tested build stays a human decision in Play Console. This is
+the same line the Apple side draws by never submitting.
+
+**Paid app? Use `internal`.** It is the only track where testers install without buying; closed and open
+testers pay like everyone else.
+
+Release notes follow supply's layout, so an existing repo needs no migration —
+`<metadataDir>/<play-locale>/changelogs/<versionCode>.txt`, falling back to `default.txt`, truncated to
+Play's 500-char cap with a warning. The versionCode comes from the bundle's own manifest, so build
+numbering stays with the build and re-uploading a used code fails loudly instead of silently replacing a
+binary. Overrides: `VYDANNE_AAB`, `VYDANNE_TRACK`, `VYDANNE_RELEASE_NAME`.
 
 **Play is dry by default on purpose.** Nothing goes live until you add `VYDANNE_COMMIT=1`, so a
 half-finished folder can never overwrite a good listing. Play also uses its **own** language codes

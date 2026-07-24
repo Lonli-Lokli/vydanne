@@ -65,4 +65,29 @@ export class PlayClient {
     if (res.status >= 300) throw new Error(`image upload ${res.status}: ${JSON.stringify(j).slice(0, 200)}`);
     return j;
   }
+
+  // ── Binaries & tracks ─────────────────────────────────────────────────────────────────────────────
+
+  /** Upload an .aab. The returned versionCode comes from the BUNDLE's manifest — Play assigns it, not us. */
+  async uploadBundle(editId, filePath) {
+    const bytes = fs.readFileSync(filePath);
+    const res = await fetch(`${UPLOAD}/applications/${this.pkg}/edits/${editId}/bundles?uploadType=media`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${this.token}`, "Content-Type": "application/octet-stream" },
+      body: bytes,
+    });
+    const j = await res.json().catch(() => ({}));
+    if (res.status >= 300) throw new Error(`bundle upload ${res.status}: ${JSON.stringify(j).slice(0, 300)}`);
+    return j;
+  }
+
+  getTrack(editId, track) { return this.req("GET", `/edits/${editId}/tracks/${track}`); }
+
+  /**
+   * Point a track at version codes. `releases` is the FULL desired state of that track — Play replaces
+   * it wholesale, so send one complete release object rather than appending to what is already there.
+   */
+  putTrack(editId, track, releases) {
+    return this.req("PUT", `/edits/${editId}/tracks/${track}`, { body: { track, releases } });
+  }
 }

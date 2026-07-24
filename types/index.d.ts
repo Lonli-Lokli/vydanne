@@ -16,6 +16,8 @@ export type CommandName =
   | 'inspect'
   | 'diff'
   | 'preflight'
+  /** Google Play only: upload an .aab to a closed testing track. Refuses `production`. */
+  | 'prerelease'
   | 'auth'
   | 'locales'
   | 'version';
@@ -58,6 +60,10 @@ export interface GoogleConfig {
   /** Listing-text folders, supply convention. Default 'fastlane/metadata/android'. */
   metadataDir?: string;
   defaultLocale?: string;
+  /** `.aab` for `prerelease` — a file, or a directory whose NEWEST .aab is taken. Override: VYDANNE_AAB. */
+  aab?: string;
+  /** Testing track for `prerelease`: 'internal' (default) | 'alpha' | 'beta'. 'production' is refused. */
+  track?: "internal" | "alpha" | "beta";
 }
 
 export interface ExportConfig {

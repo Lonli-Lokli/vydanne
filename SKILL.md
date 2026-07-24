@@ -1,38 +1,91 @@
 ---
 name: vydanne
-description: Prepare an App Store Connect / Google Play submission — write AND push the localized store listing. Crafts the ASO copy (app-store name, subtitle, the 100-char keyword field, description, promo text) grounded in the portfolio's audience research, then fills the listing + screenshots + previews, age rating, review contact, accessibility & App Privacy labels, IAP fields, and export-compliance docs; verifies with a preflight gate and diffs local-vs-live. Native Node (ES256 JWT + fetch, no fastlane/Ruby). One vydanne.config.mjs per app. Use when writing or shipping any App Store / Play listing. Never submits — a human attaches the signed build and hits Submit.
+description: Prepare an App Store Connect / Google Play submission — write AND push the localized store listing. Crafts the ASO copy (app-store name, subtitle, the 100-char keyword field, description, promo text), then fills the listing + screenshots + previews, age rating, review contact, accessibility & App Privacy labels, IAP fields, and export-compliance docs; verifies with a preflight gate and diffs local-vs-live. Native Node (ES256 JWT + fetch, no fastlane/Ruby). One vydanne.config.mjs per app. Use when writing or shipping any App Store / Play listing. Never submits — a human attaches the signed build and hits Submit.
 ---
 
 # vydanne
 
-The App Store Connect / Google Play half of a two-part release pipeline (**zdymak** makes the media;
-vydanne writes + fills the listing + compliance). Native Node — no fastlane/Ruby/Python. Two jobs:
-**(A) write the listing well (ASO)**, **(B) push it + declarations**.
+The App Store Connect / Google Play half of a two-part release pipeline. Native Node — no
+fastlane/Ruby/Python. Two jobs: **(A) write the listing well (ASO)**, **(B) push it + the declarations**.
+
+**Companion tool — [zdymak](https://www.npmjs.com/package/zdymak)** makes the *media* (screenshots, App
+Preview videos, Play feature graphic); vydanne pushes that media plus all the *text and paperwork*. If the
+user needs screenshots or a preview video produced, that's zdymak's job, not vydanne's — vydanne only
+uploads files that already exist. zdymak's default output paths are exactly the paths vydanne reads for
+Play images (below), so the two line up with no glue.
+
+**Never submits.** A human attaches the signed build and presses Submit. Don't try to work around this.
 
 ## Setup
 
+`npm i -D vydanne`, then **`npx vydanne <cmd>` from the app's repo root** — the config and every relative
+path in it resolve against the working directory. Running from a subfolder silently reads the wrong paths.
+
 One `vydanne.config.mjs` per app (schema: `vydanne.config.example.mjs`; type
-`import('vydanne').VydanneConfig`). Auth: `~/.appstoreconnect/private_keys/AuthKey_<id>.p8` +
-`ASC_KEY_ID` / `ASC_ISSUER_ID`. `npm i -D vydanne`, then `npx vydanne <cmd>` **from the app's repo root**
-(the config and its relative paths resolve against the working directory).
+`import('vydanne').VydanneConfig`). Auth: `~/.appstoreconnect/private_keys/AuthKey_<keyId>.p8` +
+`ASC_KEY_ID` / `ASC_ISSUER_ID`; Play uses `PLAY_JSON_KEY_FILE`. Node ≥20.9. Cross-platform — the key path
+resolves via `os.homedir()`, so it works on Windows (`C:\Users\<you>\.appstoreconnect\…`). On Windows
+PowerShell the `VAR=1 cmd` form does **not** exist; set `$env:VAR = "1"` first.
 
-**Config fields:** `bundleId` · `primaryLocale` (the fallback — must be populated) · `asc` · `platforms`
-(iOS and macOS are SEPARATE) · `uiLocales` (auto-mapped to ASC codes) · `metadataDir` · `rating` ·
-`privacy` · `iaps` · `previews` · `export` · `google` (Google Play).
+**Config fields:** `bundleId` · `primaryLocale` (the fallback — must be populated) · `asc` (optional
+`{keyId, issuerId}`) · `platforms` (iOS and macOS are SEPARATE) · `uiLocales` (auto-mapped to ASC codes) ·
+`metadataDir` · `rating` · `privacy` · `iaps` · `previews` · `export` · `google` (Google Play).
 
-**Google Play** — add a `google` block (`packageName`, `metadataDir`, `defaultLocale`) + `PLAY_JSON_KEY_FILE`,
-then `--store google`: `inspect` · `diff` · `preflight` · `fill` run against the Play Developer **Edits** API
-(OAuth2 service account, native; **scoped to that one `packageName`** — a shared account key can't touch
-another app). Listing lives in `<metadataDir>/<play-code>/{title,short_description,full_description}.txt` —
-Play uses its **own** locale codes (`de-DE`, `zh-CN`, `iw-IL`, `ar`, `be` …, *not* Apple's). `fill` also
-pushes the store `icon` (512²), `featureGraphic` (1024×500), and phone / 7″ / 10″ screenshots when the local
-asset exists. `fill --store google` is **DRY by default**; `VYDANNE_COMMIT=1` commits. The AAB binary and the
-(YouTube-URL) promo video stay in fastlane / the Console.
+For a non-technical user asking how to set this up from scratch, walk them through
+**`GETTING_STARTED.md`** (accounts → API key → config → folders → push) rather than improvising.
 
-## A. Writing the listing (the ASO craft — this is the durable value)
+## File layout — read this before writing any file
 
-Store copy lives per-locale in `<metadataDir>/<locale>/*.txt` (name, subtitle, keywords,
-promotional_text, description, release_notes, urls). **Write the English master first, then localize.**
+vydanne reads plain `.txt` files from fixed locations. **These conventions are not configurable beyond
+`metadataDir`; do not invent paths.**
+
+**Apple listing text** — `<metadataDir>/<ASC-locale>/*.txt` (default `metadataDir`: `fastlane/metadata`):
+
+| File | Field | Limit |
+|---|---|---|
+| `name.txt` | app name (on **AppInfo**, shared across platforms) | 30 |
+| `subtitle.txt` | subtitle (on AppInfo) | 30 |
+| `description.txt` | description (on the **version**) | 4000 |
+| `keywords.txt` | keyword field (version) | 100 |
+| `promotional_text.txt` | promo text (version) | 170 |
+| `release_notes.txt` | what's new (version) | — |
+| `marketing_url.txt`, `support_url.txt` | optional URLs (version) | — |
+
+Folder names must be **Apple's exact ASC codes** (`de-DE`, `ar-SA`, `zh-Hans`, `en-GB`…). A folder whose
+name isn't in the valid set is skipped; run `vydanne locales` to get the mapping from the config's
+`uiLocales`. A language with no App Store equivalent (e.g. Belarusian `be`) must **not** get a folder — it
+falls back to `primaryLocale`.
+
+**App Review contact** — `<metadataDir>/review_information/{first_name,last_name,phone_number,email_address,notes}.txt`.
+This is PII: keep it gitignored.
+
+**Apple screenshots** — `fastlane/screenshots/<ASC-locale>/<prefix>_<anything>.png`, and
+`fastlane/screenshots-macos/<ASC-locale>/…` for Mac. **These two base paths are hardcoded.** The token
+before the **first underscore** selects the device slot; files upload in sorted order, so number them:
+
+| Prefix | Slot |
+|---|---|
+| `iphone69_` | `APP_IPHONE_67` (6.9″) |
+| `iphone65_` | `APP_IPHONE_65` |
+| `ipad13_` | `APP_IPAD_PRO_3GEN_129` |
+| `watch_` | `APP_WATCH_ULTRA` |
+| `macos_` | `APP_DESKTOP` (in `screenshots-macos/`) |
+
+An unknown prefix is silently ignored. A set that **already has screenshots is skipped**, never
+duplicated — to replace shots, delete them in ASC first. PNGs must be **RGB with no alpha**.
+
+**Play listing text** — `<google.metadataDir>/<PLAY-locale>/{title,short_description,full_description}.txt`
+(30 / 80 / 4000). Play uses its **own** codes (`de-DE`, `zh-CN`, `iw-IL`, `ar`, `be`) — *not* Apple's
+`zh-Hans`/`he`/`ar-SA`.
+
+**Play images** — hardcoded source paths (zdymak's output), each pushed only when the file exists, so a
+missing local set never deletes the live one: `brand/icons/play/icon-512.png` (512²) ·
+`marketing/out/play-feature-graphic.png` (1024×500) · `marketing/out/play-phone-plain/` ·
+`marketing/out/play-tablet7-plain/` (7″) · `marketing/out/play-tablet-plain/` (10″).
+
+## A. Writing the listing (the ASO craft — the durable value)
+
+**Write the English master first, then localize.**
 
 ### The fields, what they're FOR, and the hard limits
 
@@ -50,62 +103,72 @@ promotional_text, description, release_notes, urls). **Write the English master 
 - **No spaces** after commas (`a,b,c` not `a, b, c`) — every char counts toward 100. **Fill all 100.**
 - **Don't repeat** any word already in `name` or `subtitle` — Apple already indexes those; repeating wastes the field.
 - **Singular OR plural, never both** — Apple matches both stems; pick one (usually singular).
-- **Omit** "app", "game", "free", and your own app name — Apple indexes those automatically.
-- Apple **auto-combines** keywords into phrases (kw+kw), so prefer **single words** to maximize combinations — no multi-word phrases unless the phrase is the exact search.
-- **No competitor trademarks** as keywords for a game (rejection risk) — even though a tool app might.
-- Prioritize by **relevance × search volume × achievable rank**: generic head terms ("puzzle") are hard to rank; mid-tail ("no guess minesweeper", "daily logic") convert AND rank. Order best-first (leading keywords weigh more).
+- **Omit** "app", "game", "free", and the app's own name — Apple indexes those automatically.
+- Apple **auto-combines** keywords into phrases (kw+kw), so prefer **single words** to maximize combinations — no multi-word phrases unless the phrase is the exact search term.
+- **No competitor trademarks** (rejection risk, especially for games).
+- Prioritize by **relevance × search volume × achievable rank**: generic head terms are hard to rank; mid-tail terms convert AND rank. Order best-first (leading keywords weigh more).
 
-### Positioning — grounded in real audience research (example: a daily puzzle game)
+### Positioning — ground it in the app's real audience, not generic hype
 
-The copy must reflect what the audience research shows, not generic hype:
-- **Lead with Completion + the daily ritual** — the one motivation that wins across every gender/age segment. "A new field every day", "keep your streak", "collect the art".
-- **Accessibility is the growth feature + our differentiator** — "every board is solvable without a guess", "no tutorial — teachable in one line", "instant play". The no-guess engine is unique; say it plainly, never a coin-flip.
-- **Make competition optional** — do NOT lead with leaderboards/ranking; the puzzle audience skews female + older and responds to calm mastery, not competitive hype.
-- **Voice: calm, premium, understated** — no gamification hype ("crush it", "🔥 streak", forced `!`). Same voice as the in-app copy (see the `game-translator` agent's voice note).
-- Name the unique visual hook — "uncover a piece of generative art as you clear the field".
+Before writing, establish what actually motivates *this* app's users (ask the user, or read whatever
+audience research/positioning docs the repo has). Then:
+
+- **Lead with the strongest shared motivation**, stated concretely — not a feature list.
+- **Name the genuine differentiator plainly.** If there's one thing competitors can't claim, say it in
+  the subtitle, not buried in paragraph four.
+- **Match the audience's temperature.** A calm, premium audience reacts badly to hype punctuation and
+  competitive framing; a competitive audience finds understatement flat. Mirror the in-app voice.
+- **Be honest in the close** — "no ads", "no account", "buy once" only if true. Claims here are checkable.
+- Don't lead with mechanics the audience doesn't care about (leaderboards, streaks) just because they exist.
 
 ### Description shape (App Store & Play)
 
-Hook (1–2 lines: the promise) → **WHY <APP>** (3–5 benefit bullets, each benefit-first) → what it is /
-who it's for → honest close (no ads / no account / free-to-play, whatever's true). Keep it scannable;
-lead each bullet with the payoff, not the feature. A tight, benefit-led `description.txt` where every
-bullet opens with the payoff is the bar.
-
-### Keyword seed per game (research the REAL terms; curate to ~100 chars)
-
-Niva (minesweeper) starting pool — drop any word in the name/subtitle, pick singular, order by value:
-`minesweeper,mines,daily,no guess,logic,brain,sweeper,board,minesweep,deduction,brain training,offline,streak,solvable,number,flag,classic,relax` → trim to fit 100 with the highest-value first. Validate real
-demand where possible (App Store search suggestions, competitor titles) before committing.
+Hook (1–2 lines: the promise) → **WHY \<APP\>** (3–5 benefit bullets, each benefit-first) → what it is /
+who it's for → honest close. Keep it scannable; lead each bullet with the payoff, not the feature.
 
 ### Localizing the listing (transcreation, not translation)
 
-- **App name**: the brand ("Niva") is **never** translated; the DESCRIPTOR ("Daily Minesweeper") MAY be localized per store locale.
-- **Keywords**: use the target market's **actual search terms**, not a dictionary translation — e.g. minesweeper → `Buscaminas` (es), `マインスイーパー` (ja), `Сапёр` (ru/be/uk), `Minensuchspiel/Minesweeper` (de). Research per market.
-- **Subtitle / promo / description**: **transcreate** — adapt the benefit + tone naturally; never word-for-word.
-- Fan out one locale per **`store-copywriter`** agent (Sonnet), same pattern as `translate-game`/`game-translator`. Give each: the master English copy, the target locale, its `<metadataDir>/<locale>/` dir, the brand name (untranslated), and the positioning above.
+- **App name**: the brand is **never** translated; the DESCRIPTOR may be localized per store locale.
+- **Keywords**: use the target market's **actual search terms**, not a dictionary translation. Research
+  per market — the literal translation of a category name is often not what people type.
+- **Subtitle / promo / description**: **transcreate** — adapt benefit + tone naturally; never word-for-word.
+- **Fan out one agent per locale** (a Sonnet-tier translator/copywriter is the right size). Give each:
+  the master English copy, the target locale, its `<metadataDir>/<ASC-locale>/` directory, the brand name
+  (untranslated), the character limits, and the positioning above. Validate limits after the merge —
+  translations routinely blow the 30-char fields.
 
 ## B. Commands (push it)
 
 `fill` (metadata + screenshots, native PATCH/chunked upload — works even at READY_FOR_REVIEW) ·
 `previews` (App Preview videos) · `age-rating` · `review-contact` · `accessibility` (draft; publish once
-live) · `privacy` (UI/passkey — the API can't reach Apple's iris host) · `iap` (validate + RGB flatten) ·
-`compliance` (US self-classification PDF) · `diff` (what differs vs live) · `preflight` (completeness gate) ·
-`inspect` · `locales` · `version`. Never submits.
+live) · `privacy` (prints answers for the UI — the API can't reach Apple's iris host) · `iap` (validate +
+RGB flatten) · `compliance` (US self-classification PDF) · `diff` (what differs vs live) · `preflight`
+(completeness gate) · `inspect` · `locales` · `version`.
+
+`--store google` routes `inspect` · `diff` · `preflight` · `fill` to the Play Developer **Edits** API
+(OAuth2 service account; **scoped to the config's `packageName`** — a shared key can't touch another app).
+`fill --store google` is **DRY by default**; `VYDANNE_COMMIT=1` commits. The AAB binary and the
+(YouTube-URL) promo video stay outside vydanne.
+
+**Env toggles:** `VYDANNE_CONFIG` · `VYDANNE_SKIP_METADATA` / `VYDANNE_SKIP_SCREENSHOTS` (fill) ·
+`VYDANNE_COMMIT` (Play fill) · `VYDANNE_REPLACE` (previews) · `VYDANNE_FLATTEN=<png>` (iap) ·
+`VYDANNE_A11Y_PUBLISH` (accessibility).
 
 ## Flow
 
-config → **write English master listing (ASO, research-grounded)** → `preflight` (char limits) → fan out
-`store-copywriter` per locale → zdymak media → `fill` + `previews` + declarations → `diff` (dry-run) →
-`preflight` (must be green) → a human submits.
+config → **write the English master listing (ASO, research-grounded)** → `preflight` (char limits) → fan
+out one copywriter agent per locale → media from zdymak → `fill` + `previews` + declarations → `diff`
+(dry-run) → `preflight` (must be green) → **a human submits**.
 
 ## Gotchas it encodes (don't re-derive)
 
 ASC locale folder codes must be exact (`de`→`de-DE`; a bad one aborts the upload) · `name`/`subtitle` on
 AppInfo vs `description`/`keywords`/`promo` on the version · macOS is a separate platform · list endpoints
 return sparse/empty text (read each localization by id) · primary locale must be populated · App Privacy is
-on the `iris` host (JWT 401s) · accessibility can't publish until live · edit-version/app-info/deliver all
-break at READY_FOR_REVIEW (fetch by id; native PATCH still works) · screenshots/IAP images must be RGB
-no-alpha · IAP has two image slots · char limits (name/subtitle 30, keywords 100, promo 170; IAP name 30 /
-desc 45; Play title 30 / short 80 / full 4000) · **Play uses its OWN locale codes** (folder = Play code:
-`zh-CN`/`iw-IL`/`ar`/`be`, not Apple's `zh-Hans`/`he`/`ar-SA`) · Play images push only when the local file
-exists (icon 512², featureGraphic 1024×500, phone / 7″ / 10″) so a missing set never wipes the live one.
+on the `iris` host (JWT 401s — UI only) · accessibility can't publish until live (409) · edit-version /
+app-info / deliver all break at READY_FOR_REVIEW (fetch by id; native PATCH still works) ·
+screenshots/IAP images must be RGB no-alpha · IAP has two image slots (tall review screenshot vs 1024²
+promo) · char limits (name/subtitle 30, keywords 100, promo 170; IAP name 30 / desc 45; Play title 30 /
+short 80 / full 4000) · **Play uses its OWN locale codes** · Play images push only when the local file
+exists, so a missing set never wipes the live one · Apple requires `name` when *creating* an app-info
+localization (409 otherwise).

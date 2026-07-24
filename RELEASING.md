@@ -38,9 +38,19 @@ prompts for your 2FA OTP — no stored token):
 npm run release:patch      # or release:minor / release:major
 ```
 
-`scripts/release.mjs` refuses to run on a dirty tree and runs both drift guards (`check:docs`,
-`check:types`) first. Provenance is only generated on the CI/OIDC path, so prefer the GitHub Release flow
-for regular releases.
+`scripts/release.mjs` refuses to run on a dirty tree, **verifies npm auth before touching anything**, and
+runs both drift guards (`check:docs`, `check:types`) first. Provenance is only generated on the CI/OIDC
+path, so prefer the GitHub Release flow for regular releases.
+
+**The npm auth gate.** `npm version` creates a commit *and* a tag, so a login problem discovered at
+`npm publish` time would leave the repo bumped and tagged with nothing published — annoying to unpick. The
+script therefore checks `npm whoami` and `npm owner ls vydanne` up front and aborts while the tree is still
+clean. An unclaimed name is treated as a first publish, not an error. Check yourself anytime with:
+
+```sh
+npm whoami            # who am I publishing as?
+npm owner ls vydanne  # may this account publish it? (404 until the first publish)
+```
 
 ## Notes
 

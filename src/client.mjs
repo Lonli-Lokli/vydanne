@@ -3,7 +3,12 @@ import { makeToken } from "./jwt.mjs";
 const API = "https://api.appstoreconnect.apple.com";
 const IRIS = "https://appstoreconnect.apple.com/iris";
 const DEAD_VERSION = ["READY_FOR_SALE", "REMOVED_FROM_SALE", "REPLACED_WITH_NEW_VERSION"];
-const DEAD_INFO = ["READY_FOR_SALE", "REPLACED_WITH_NEW_VERSION", "REMOVED_FROM_SALE"];
+// READY_FOR_DISTRIBUTION is Apple's newer name for the LIVE app-info (they're migrating the
+// state vocabulary; versions still report appStoreState=READY_FOR_SALE). Without it here,
+// appInfo() treats the live record as editable and every name/subtitle PATCH comes back
+// ENTITY_ERROR.ATTRIBUTE.INVALID.INVALID_STATE — which fails the whole locale in `fill`,
+// release notes included, on any app that already has a version on sale.
+const DEAD_INFO = ["READY_FOR_SALE", "READY_FOR_DISTRIBUTION", "REPLACED_WITH_NEW_VERSION", "REMOVED_FROM_SALE"];
 
 // Thin ASC REST client. Encodes the gotchas: `iris` host (App Privacy 401s the JWT), version + app-info
 // fetched from the FULL list (get_edit filters out READY_FOR_REVIEW), and individual localization reads

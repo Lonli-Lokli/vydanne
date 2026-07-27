@@ -26,6 +26,12 @@ export type CommandName =
   | 'previews'
   | 'iap'
   | 'compliance'
+  /**
+   * Map zdymak's output (`store-assets/<locale>/<target>/NN-name.png`) onto the folders `fill`
+   * uploads from — ASC locale codes, device-slot filename prefixes, and the Play read paths.
+   * Local files only; `--dry-run` previews. Run after `zdymak screenshots`/`build`, before `fill`.
+   */
+  | 'bridge'
   | 'inspect'
   | 'diff'
   | 'preflight'

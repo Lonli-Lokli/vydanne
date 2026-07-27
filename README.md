@@ -42,8 +42,12 @@ vydanne has a sibling — **[zdymak](https://github.com/Lonli-Lokli/zdymak)**. T
 | Makes | The **pictures** — screenshots, App Preview videos, the Play feature graphic | The **words and the paperwork** — listing text, ratings, contacts, privacy, compliance |
 | Ends with | Image and video files on disk | A listing filled in and verified, ready for a human to submit |
 
-Use them together: zdymak produces the assets, vydanne uploads them alongside your text. Use vydanne
-alone if you already have your screenshots.
+Use them together: zdymak produces the assets, **`npx vydanne bridge`** moves them to where vydanne
+reads (zdymak writes one `store-assets/` tree with short locale codes and numbered files; vydanne reads
+`fastlane/screenshots/<Apple-locale>/` with device-prefixed names, and fixed `marketing/out/` paths for
+Play), and `fill` uploads them alongside your text. Run `bridge` after every capture — skipping it means
+`fill` quietly re-uploads whatever was bridged last time. Use vydanne alone if you already have your
+screenshots in its layout.
 
 <br>
 
@@ -221,6 +225,7 @@ Two details worth knowing:
 | `privacy` | Prints the privacy answers to paste into Apple's website (Apple's privacy section has no API). |
 | `iap` | Checks your in-app purchase text fits, and can strip transparency from an image. |
 | `compliance` | Generates the US encryption self-classification PDF that Apple asks for. |
+| `bridge` | Moves [zdymak](https://github.com/Lonli-Lokli/zdymak)'s captured screenshots into the folders `fill` reads — renaming locales to the stores' codes and files to the device-slot convention. Local files only; `--dry-run` previews. Run it after every capture. |
 | `version` | Prints the version of vydanne. |
 
 For **Google Play**, add `--store google` to `inspect`, `diff`, `preflight`, `fill`, or `prerelease`.

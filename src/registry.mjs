@@ -26,6 +26,9 @@ export const COMMANDS = {
   previews: { mod: "previews", client: true, writes: true },
   iap: { mod: "iap", client: false },
   compliance: { mod: "compliance", client: false },
+  // Maps zdymak's output layout onto the folders `fill` reads. Local files only (like privacy and
+  // compliance above), so it is not marked `writes` — it has its own `--dry-run` instead.
+  bridge: { mod: "bridge", client: false },
   inspect: { mod: "inspect", client: true },
   diff: { mod: "diff", client: true },
   preflight: { mod: "preflight", client: true },

@@ -130,6 +130,8 @@ usage: vydanne <command> [--apply] [--config vydanne.config.mjs]
 ✎ previews        upload App Preview videos (native chunked upload)
   iap             validate IAP fields; VYDANNE_FLATTEN=<png> flattens a screenshot to RGB
   compliance      generate the US encryption self-classification PDF
+  bridge          map zdymak's store-assets output onto the folders \`fill\` reads (locale codes,
+                  device prefixes, Play paths). Local files only; --dry-run previews.
   inspect         read-only ASC state
   diff            show what differs between local (metadata/screenshots/previews) and ASC
   preflight       verify submission-completeness (the gotcha checker)

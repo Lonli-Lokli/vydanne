@@ -11,8 +11,12 @@ fastlane/Ruby/Python. Two jobs: **(A) write the listing well (ASO)**, **(B) push
 **Companion tool — [zdymak](https://www.npmjs.com/package/zdymak)** makes the *media* (screenshots, App
 Preview videos, Play feature graphic); vydanne pushes that media plus all the *text and paperwork*. If the
 user needs screenshots or a preview video produced, that's zdymak's job, not vydanne's — vydanne only
-uploads files that already exist. zdymak's default output paths are exactly the paths vydanne reads for
-Play images (below), so the two line up with no glue.
+uploads files that already exist. **The two do NOT line up on disk** (they did before zdymak 0.15):
+zdymak writes one root shaped `store-assets/<locale>/<target>/NN-name.png`, while vydanne reads several
+hardcoded roots, with Apple's locale codes and a device-prefix filename convention. **`vydanne bridge`
+is the glue** — run it after `zdymak screenshots`/`zdymak build` and before `fill`, every time.
+Skipping it is silent and dangerous: zdymak reports success, vydanne re-uploads whatever was bridged
+LAST time, and the store quietly keeps stale art.
 
 **Never submits for review; never ships to the public.** It *does* upload builds — `prerelease` sends
 the `.ipa` to TestFlight (internal groups) or the `.aab` to a Play closed track, and points the version
@@ -101,10 +105,20 @@ duplicated — to replace shots, delete them in ASC first. PNGs must be **RGB wi
 (30 / 80 / 4000). Play uses its **own** codes (`de-DE`, `zh-CN`, `iw-IL`, `ar`, `be`) — *not* Apple's
 `zh-Hans`/`he`/`ar-SA`.
 
-**Play images** — hardcoded source paths (zdymak's output), each pushed only when the file exists, so a
-missing local set never deletes the live one: `brand/icons/play/icon-512.png` (512²) ·
+**Play images** — hardcoded source paths, each pushed only when the file exists, so a missing local set
+never deletes the live one: `brand/icons/play/icon-512.png` (512², from znachok) ·
 `marketing/out/play-feature-graphic.png` (1024×500) · `marketing/out/play-phone-plain/` ·
-`marketing/out/play-tablet7-plain/` (7″) · `marketing/out/play-tablet-plain/` (10″).
+`marketing/out/play-tablet7-plain/` (7″) · `marketing/out/play-tablet-plain/` (10″). An image dir that
+exists but is EMPTY is reported (by `fill` and `diff`) as a live set only Play Console can remove.
+
+**`bridge` populates both screenshot layouts from zdymak's output.** It maps
+`store-assets/<locale>/<target>/NN-name.png` onto the Apple and Play paths above: locale codes via the
+same `toAsc` table `fill` uses (`de` → `de-DE`; a code with no App Store language is skipped and falls
+back to the primary listing), the device-slot prefix prepended (`iphone69_01-fresh.png`), and the Play
+targets into `marketing/out/…`. Each destination is rebuilt from empty (idempotent — removed upstream
+means removed here), a locale with screenshots but NO listing text is held back (uploading pictures
+alone would create the localization and break its fallback to the primary language), and every bridged
+PNG is checked for an alpha channel, which Apple rejects. Local files only; `--dry-run` previews.
 
 ## A. Writing the listing (the ASO craft — the durable value)
 
@@ -165,8 +179,10 @@ who it's for → honest close. Keep it scannable; lead each bullet with the payo
 `fill` (metadata + screenshots, native PATCH/chunked upload — works even at READY_FOR_REVIEW) ·
 `previews` (App Preview videos) · `age-rating` · `review-contact` · `accessibility` (draft; publish once
 live) · `privacy` (prints answers for the UI — the API can't reach Apple's iris host) · `iap` (validate +
-RGB flatten) · `compliance` (US self-classification PDF) · `diff` (what differs vs live) · `preflight`
-(completeness gate + cross-store lint) · `inspect` · `auth` (what credentials resolved, and from where) · `locales` · `version`.
+RGB flatten) · `compliance` (US self-classification PDF) · `bridge` (zdymak's output → the folders
+`fill` reads) · `diff` (what differs vs live, text AND media by checksum) · `preflight`
+(completeness gate + cross-store lint + stale-screenshot check) · `inspect` · `auth` (what credentials
+resolved, and from where) · `locales` · `version`.
 
 **Cross-store lint.** `preflight` and `fill` refuse listing text that names the other mobile platform
 — App Review 2.3.10 for Apple, the Store Listing and Promotion policy for Google — scanning every
@@ -258,9 +274,10 @@ through that client. **A new command that touches the store must be marked `writ
 ## Flow
 
 config → **write the English master listing (ASO, research-grounded)** → fan out one copywriter agent
-per locale → media from zdymak → build via `prerelease --apply` whenever it is ready → `push` (read the
-dry run, then re-run with `--apply` — it is prepare → fill → previews → age-rating → review-contact →
-accessibility → preflight, stopping at the first failure) → `diff` to confirm → **a human submits**.
+per locale → media from zdymak → **`bridge`** (zdymak's output into vydanne's folders — every time) →
+build via `prerelease --apply` whenever it is ready → `push` (read the dry run, then re-run with
+`--apply` — it is prepare → fill → previews → age-rating → review-contact → accessibility → preflight,
+stopping at the first failure) → `diff` to confirm → **a human submits**.
 
 ## Gotchas it encodes (don't re-derive)
 

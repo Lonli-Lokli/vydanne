@@ -329,11 +329,20 @@ the same line the Apple side draws by never submitting.
 **Paid app? Use `internal`.** It is the only track where testers install without buying; closed and open
 testers pay like everyone else.
 
-Release notes follow supply's layout, so an existing repo needs no migration —
-`<metadataDir>/<play-locale>/changelogs/<versionCode>.txt`, falling back to `default.txt`, truncated to
-Play's 500-char cap with a warning. The versionCode comes from the bundle's own manifest, so build
-numbering stays with the build and re-uploading a used code fails loudly instead of silently replacing a
-binary. Overrides: `VYDANNE_AAB`, `VYDANNE_TRACK`, `VYDANNE_RELEASE_NAME`.
+Release notes follow supply's layout, so an existing repo needs no migration — per locale, first match
+wins:
+
+| File in `<metadataDir>/<play-locale>/changelogs/` | When to use it |
+|---|---|
+| `<versionCode>.txt` | You know the exact code (supply's own convention). |
+| `next.txt` | **The notes for the release you're about to cut** — for when the versionCode isn't knowable in advance (e.g. it's derived from the git commit count, so every commit moves it). After a real (`--apply`) publish, vydanne renames it to `<versionCode>.txt`, so the *next* release can't inherit this one's notes by accident. |
+| `default.txt` | Evergreen fallback ("bug fixes and improvements"). Falling back to it is **warned**, because notes written for one release quietly serving every later one is how a listing shows last release's news. |
+
+Notes are truncated to Play's 500-char cap with a warning. The versionCode comes from the bundle's own
+manifest — vydanne reads it out of the `.aab` locally and reports which changelog file each locale
+resolves to *before* the upload, so a wrong file costs a re-run, not a re-release. Re-uploading a used
+code fails loudly instead of silently replacing a binary. Overrides: `VYDANNE_AAB`, `VYDANNE_TRACK`,
+`VYDANNE_RELEASE_NAME`.
 
 **Play is dry by default on purpose.** Nothing goes live until you add `--apply`, so a
 half-finished folder can never overwrite a good listing. Play also uses its **own** language codes

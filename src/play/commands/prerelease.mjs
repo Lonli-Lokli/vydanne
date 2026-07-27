@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { green, yellow, red } from "../../util.mjs";
+import { readAabVersionCode } from "../aab.mjs";
 
 /** Tracks this command will write. `production` is deliberately absent — see below. */
 const TESTING_TRACKS = new Set(["internal", "alpha", "beta"]);
@@ -44,6 +45,16 @@ export async function run(config, client) {
   console.log(green(`prerelease → track "${track}"`));
   console.log(`  bundle: ${path.relative(process.cwd(), aab) || aab}  (${(fs.statSync(aab).size / 1e6).toFixed(1)} MB)`);
 
+  // The bundle declares its own versionCode, so read it HERE — before the multi-megabyte upload — and
+  // resolve the changelogs against it while there is still time to fix them. In repos that derive the
+  // code from `git rev-list --count HEAD` it is unknowable in advance, so nobody can pre-name
+  // `<versionCode>.txt`; the fallback used to win silently and the first place the real number ever
+  // appeared was Play's upload response. A null here (unreadable bundle) degrades to exactly that old
+  // behaviour: Play's answer after upload stays the authority either way.
+  const declared = readAabVersionCode(aab);
+  if (declared != null) console.log(`  versionCode ${declared} (read from the bundle's manifest)`);
+  let notes = declared != null ? readNotes(g.metadataDir, declared, g.defaultLocale) : null;
+
   const editId = await client.newEdit();
   try {
     // Upload, or REUSE. Play rejects a versionCode it already holds, which is the right answer for an
@@ -63,16 +74,17 @@ export async function run(config, client) {
       console.log(yellow(`  versionCode ${versionCode} already uploaded — reusing that bundle`));
     }
 
-    const releaseNotes = readNotes(g.metadataDir, versionCode, g.defaultLocale);
-    if (releaseNotes.length) {
-      console.log(`  release notes: ${releaseNotes.length} locale(s) — ${releaseNotes.map((n) => n.language).join(", ")}`);
-    } else {
-      console.log(yellow(`  no release notes found under ${g.metadataDir}/<locale>/changelogs/{${versionCode},default}.txt`));
+    if (declared != null && declared !== versionCode) {
+      // Play's answer is derived from the same manifest, so a disagreement means OUR parser misread the
+      // bundle — say so and re-resolve the notes against the truth rather than shipping the wrong file.
+      console.log(yellow(`  bundle parse said ${declared} but Play says ${versionCode} — trusting Play (please report this)`));
+      notes = null;
     }
+    if (!notes) notes = readNotes(g.metadataDir, versionCode, g.defaultLocale);
 
     // One complete release object: Play replaces the track's releases wholesale.
     const release = { status: "completed", versionCodes: [String(versionCode)] };
-    if (releaseNotes.length) release.releaseNotes = releaseNotes;
+    if (notes.entries.length) release.releaseNotes = notes.entries;
     const name = process.env.VYDANNE_RELEASE_NAME;
     if (name) release.name = name;
 
@@ -87,6 +99,7 @@ export async function run(config, client) {
     const res = await client.commit(editId);
     if (res.status >= 300) throw new Error(`edits.commit ${res.status}: ${JSON.stringify(res.json).slice(0, 300)}`);
     console.log(green(`\n  committed — versionCode ${versionCode} is live on "${track}".`));
+    archiveNextNotes(notes, versionCode);
     console.log("  Production stays manual: promote it in Play Console when you're ready.");
     return true;
   } catch (e) {
@@ -111,27 +124,79 @@ function resolveAab(configured) {
 }
 
 /**
- * Release notes per locale, following fastlane supply's layout so an existing repo needs no migration:
- * `<metadataDir>/<play-locale>/changelogs/<versionCode>.txt`, falling back to `default.txt`.
+ * Release notes per locale — supply's layout, plus a convention that breaks the naming circularity:
+ *
+ *   <metadataDir>/<play-locale>/changelogs/<versionCode>.txt   exact — supply's own convention
+ *                                          next.txt            THIS release, named before its code exists
+ *                                          default.txt         evergreen fallback ("bug fixes")
+ *
+ * `next.txt` exists because `<versionCode>.txt` cannot be written in advance when the code is derived
+ * from the commit count: every commit moves the number, so the only file you could name ahead of time
+ * was `default.txt` — which then also serves every FUTURE release, silently. Write this release's
+ * notes as `next.txt`; after a real commit they are archived as `<versionCode>.txt` (the code is known
+ * by then), so the next release cannot inherit them by accident.
+ *
+ * Which file won is reported per source, and the default.txt fallback is a WARNING — it used to be
+ * indistinguishable from an exact match, which is how a release ships with last release's notes.
  */
 function readNotes(metadataDir, versionCode, defaultLocale) {
-  const out = [];
-  if (!metadataDir || !fs.existsSync(metadataDir)) return out;
+  const entries = [];
+  const bySource = { [`${versionCode}.txt`]: 0, "next.txt": 0, "default.txt": 0 };
+  const nextFiles = [];
+  const empty = [];
+  if (!metadataDir || !fs.existsSync(metadataDir)) return { entries, nextFiles };
   for (const language of fs.readdirSync(metadataDir)) {
     const dir = path.join(metadataDir, language, "changelogs");
     if (!fs.existsSync(dir)) continue;
-    const file = [path.join(dir, `${versionCode}.txt`), path.join(dir, "default.txt")].find((f) => fs.existsSync(f));
+    const file = [`${versionCode}.txt`, "next.txt", "default.txt"].map((f) => path.join(dir, f)).find((f) => fs.existsSync(f));
     if (!file) continue;
     const text = fs.readFileSync(file, "utf8").trim();
-    if (!text) continue;
+    // An empty file would otherwise drop the locale without a word — name it below instead.
+    if (!text) { empty.push(`${language}/${path.basename(file)}`); continue; }
+    bySource[path.basename(file)]++;
+    if (path.basename(file) === "next.txt") nextFiles.push(file);
     // Play caps release notes at 500 chars and rejects the whole edit if any locale is over.
     if (text.length > 500) {
       console.log(yellow(`  ${language}: release notes ${text.length}/500 chars — truncated`));
-      out.push({ language, text: text.slice(0, 500) });
+      entries.push({ language, text: text.slice(0, 500) });
     } else {
-      out.push({ language, text });
+      entries.push({ language, text });
     }
   }
   // Keep the default locale first purely so the log reads sensibly.
-  return out.sort((a, b) => (a.language === defaultLocale ? -1 : b.language === defaultLocale ? 1 : 0));
+  entries.sort((a, b) => (a.language === defaultLocale ? -1 : b.language === defaultLocale ? 1 : 0));
+
+  if (!entries.length) {
+    console.log(yellow(`  no release notes found under ${notesPattern(metadataDir, versionCode)}`));
+  } else {
+    const parts = Object.entries(bySource).filter(([, n]) => n).map(([f, n]) => `${n} from ${f}`);
+    console.log(`  release notes for versionCode ${versionCode}: ${entries.length} locale(s) — ${parts.join(" · ")}`);
+    if (bySource["default.txt"]) {
+      console.log(yellow(`  ${bySource["default.txt"]} locale(s) fell back to default.txt — no ${versionCode}.txt or next.txt.`));
+      console.log(yellow("  If those notes describe an older release, write this one's as changelogs/next.txt."));
+    }
+  }
+  if (empty.length) console.log(yellow(`  empty changelog file(s), locale dropped: ${empty.join(", ")}`));
+  return { entries, nextFiles };
+}
+
+const notesPattern = (dir, code) => `${dir}/<locale>/changelogs/{${code},next,default}.txt`;
+
+/**
+ * After a REAL commit, park each next.txt under the versionCode it just shipped as. Renaming (not
+ * copying) is the point: a `next.txt` that lingered would be picked up by the NEXT release too, and
+ * "this release's notes" quietly becoming "every release's notes" is the exact failure default.txt
+ * already has. The rename also lands on supply's own `<versionCode>.txt` convention, so the history
+ * of what shipped with what stays greppable.
+ */
+function archiveNextNotes(notes, versionCode) {
+  for (const file of notes.nextFiles) {
+    const to = path.join(path.dirname(file), `${versionCode}.txt`);
+    try {
+      fs.renameSync(file, to);
+      console.log(`  archived ${path.relative(process.cwd(), file)} -> ${versionCode}.txt`);
+    } catch (e) {
+      console.log(yellow(`  could not archive ${file}: ${e.message} — rename it to ${versionCode}.txt yourself, or the next release reuses it`));
+    }
+  }
 }

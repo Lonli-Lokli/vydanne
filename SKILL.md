@@ -207,10 +207,14 @@ edit transaction. `production` is REFUSED — not flag-gated — so no argument 
 public; promoting the tested build stays a human's job, mirroring the Apple side never submitting. Track
 comes from `google.track` / `VYDANNE_TRACK`, default `internal`; the bundle from `google.aab` /
 `VYDANNE_AAB` (a directory takes its newest `.aab`). **For a PAID app use `internal`** — it's the only
-track where testers install without buying. Notes follow supply's layout:
-`<google.metadataDir>/<play-locale>/changelogs/<versionCode>.txt`, falling back to `default.txt`, capped
-at Play's 500 chars. DRY by default; `--apply` publishes. The versionCode comes from the bundle itself,
-so re-uploading one fails loudly instead of silently replacing.
+track where testers install without buying. Notes follow supply's layout, per locale, first match wins:
+`<google.metadataDir>/<play-locale>/changelogs/<versionCode>.txt` → `next.txt` → `default.txt`, capped
+at Play's 500 chars. **Write the upcoming release's notes as `next.txt`** when the versionCode is not
+knowable in advance (derived from the commit count, say): after a real publish vydanne renames it to
+`<versionCode>.txt` so the next release can't inherit it, and a `default.txt` fallback is WARNED rather
+than silent. The versionCode is read out of the `.aab` locally and the changelog resolution reported
+BEFORE the upload; re-uploading a used code fails loudly instead of silently replacing. DRY by default;
+`--apply` publishes.
 
 `--store google` routes `inspect` · `diff` · `preflight` · `fill` · `prerelease` to the Play Developer **Edits** API
 (OAuth2 service account; **scoped to the config's `packageName`** — a shared key can't touch another app).

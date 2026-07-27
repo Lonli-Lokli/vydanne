@@ -177,7 +177,11 @@ export declare class Client {
    * back to the version on sale; writes must never target it.
    */
   editVersion(platform: Platform, opts?: { allowLive?: boolean }): Promise<any>;
-  appInfo(): Promise<any>;
+  /**
+   * The app-info being prepared (name/subtitle, age rating), or null when none exists. `allowLive`
+   * (read-only commands only) falls back to the live record; writes must never target it.
+   */
+  appInfo(opts?: { allowLive?: boolean }): Promise<any>;
   versionLocalizations(versionId: string): Promise<any[]>;
   localization(id: string, kind?: string): Promise<Record<string, unknown>>;
 }

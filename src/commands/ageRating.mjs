@@ -6,8 +6,16 @@ import { green, yellow, red } from "../util.mjs";
 export async function run(config, client) {
   if (config.rating !== "4+") { console.error(yellow(`age-rating: only '4+' (all-NONE) implemented; config=${config.rating}`)); return false; }
   await client.findApp(config.bundleId);
+  // No allowLive: this PATCHes the age-rating declaration, and the live app-info's declaration is not
+  // ours to aim a write at. The refusal below used to be unreachable — appInfo() handed back the live
+  // record instead of null, so the write was planned against it and Apple's INVALID_STATE was the
+  // first anyone heard of it.
   const info = await client.appInfo();
-  if (!info) { console.error(red("age-rating: no editable app info")); return false; }
+  if (!info) {
+    console.error(red("age-rating: no editable app info — refusing to write to the live record."));
+    console.error("  `vydanne prepare --apply` starts the next version, which makes app info editable again.");
+    return false;
+  }
   const { json } = await client.get(`/v1/appInfos/${info.id}/ageRatingDeclaration`);
   const id = json.data?.id;
   if (!id) { console.error(red("age-rating: no declaration")); return false; }

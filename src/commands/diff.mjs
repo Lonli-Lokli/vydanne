@@ -18,7 +18,10 @@ const short = (s, n = 24) => { s = String(s).replace(/\n/g, " "); return s.lengt
 // Connect — i.e. what `fill` / `previews` would change. Reads each localization by id (list is sparse).
 export async function run(config, client) {
   await client.findApp(config.bundleId);
-  const info = await client.appInfo();
+  // allowLive for the same reason as editVersion below: comparing local name/subtitle against what is
+  // on sale is a legitimate read, and on an app with nothing in preparation the live record is the
+  // only one to compare against.
+  const info = await client.appInfo({ allowLive: true });
   const infoLocs = info ? (await client.get(`/v1/appInfos/${info.id}/appInfoLocalizations?limit=200`)).json.data || [] : [];
   let actionable = 0; // differences `fill`/`previews` would actually change (release_notes on a 1.0 is benign)
 

@@ -103,10 +103,26 @@ export class Client {
     return allowLive ? data[0] || null : null;
   }
 
-  async appInfo() {
+  /**
+   * The app-info being PREPARED (name/subtitle, age rating live on it) — or null when there isn't one.
+   *
+   * Same disease, same cure as editVersion() above: this fell back to `data[0]` — the LIVE app-info —
+   * whenever nothing editable existed, and the fallback aimed writes at the record customers see. It is
+   * how the DEAD_INFO bug was found in the first place (every name/subtitle PATCH against the live
+   * record comes back INVALID_STATE and fails the whole locale in `fill`), and adding
+   * READY_FOR_DISTRIBUTION to DEAD_INFO only fixed the case where an editable sibling EXISTS to be
+   * found; the moment there is none, `|| data[0]` reintroduced exactly the state that comment warns
+   * about. Now a write gets null and a clear skip instead of twenty locales of ENTITY_ERROR.
+   *
+   * `allowLive` is for reads (`diff`), where "how does local compare with what is on sale" is the
+   * question being asked.
+   */
+  async appInfo({ allowLive = false } = {}) {
     const { json } = await this.get(`/v1/apps/${this.appId}/appInfos?limit=10`);
     const data = json.data || [];
-    return data.find((i) => !DEAD_INFO.includes(i.attributes.state)) || data[0] || null;
+    const editable = data.find((i) => !DEAD_INFO.includes(i.attributes.state));
+    if (editable) return editable;
+    return allowLive ? data[0] || null : null;
   }
 
   async versionLocalizations(versionId) {

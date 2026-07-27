@@ -60,7 +60,12 @@ export async function run(config, client) {
     console.error(red("fill: refusing to upload — fix the listing text, or set VYDANNE_ALLOW_CROSS_STORE=1."));
     return false;
   }
+  // No allowLive: name/subtitle live on the app-info record, and the live one must never take a PATCH
+  // (Apple would refuse each with INVALID_STATE, failing the whole locale — release notes included).
   const info = await client.appInfo();
+  // Said out loud, because the `if (info)` guard below otherwise skips name/subtitle for every locale
+  // in perfect silence — twenty locales of "written" with two fields quietly missing from each.
+  if (!info) console.log(yellow("  no editable app info — name/subtitle will be skipped (the live record is not writable)"));
   const infoLocs = info ? (await client.get(`/v1/appInfos/${info.id}/appInfoLocalizations?limit=200`)).json.data || [] : [];
 
   for (const platform of config.platforms) {

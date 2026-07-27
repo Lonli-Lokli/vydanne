@@ -1,6 +1,6 @@
 {
   "name": "vydanne",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "App Store Connect + Google Play submission prep — the companion to zdymak (media). Native Node (no fastlane/Ruby/Python): localized listings, screenshot/preview/icon upload, ratings, review contact, accessibility & privacy labels, IAP, export docs, build upload to TestFlight / a Play closed track, a diff of local-vs-store, and a preflight verifier that encodes the store gotchas. Never submits for review. iOS/macOS via the ASC REST API; Android via the Play Developer Edits API (--store google).",
   "keywords": [
     "app-store-connect",

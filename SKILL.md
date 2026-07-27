@@ -1,6 +1,6 @@
 ---
 name: vydanne
-description: Prepare an App Store Connect / Google Play submission — write AND push the localized store listing. Crafts the ASO copy (app-store name, subtitle, the 100-char keyword field, description, promo text), then fills the listing + screenshots + previews, age rating, review contact, accessibility & App Privacy labels, IAP fields, and export-compliance docs; verifies with a preflight gate and diffs local-vs-live. Native Node (ES256 JWT + fetch, no fastlane/Ruby). One vydanne.config.mjs per app. Use when writing or shipping any App Store / Play listing. Never submits — a human attaches the signed build and hits Submit.
+description: Prepare an App Store Connect / Google Play submission — write AND push the localized store listing. Crafts the ASO copy (app-store name, subtitle, the 100-char keyword field, description, promo text), then fills the listing + screenshots + previews, age rating, review contact, accessibility & App Privacy labels, IAP fields, and export-compliance docs; verifies with a preflight gate and diffs local-vs-live. Native Node (ES256 JWT + fetch, no fastlane/Ruby). One vydanne.config.mjs per app. Use when writing or shipping any App Store / Play listing. Uploads builds to testers (TestFlight internal / Play closed track) and points the prepared version at them — but never submits for review and never ships to the public.
 ---
 
 # vydanne
@@ -14,7 +14,11 @@ user needs screenshots or a preview video produced, that's zdymak's job, not vyd
 uploads files that already exist. zdymak's default output paths are exactly the paths vydanne reads for
 Play images (below), so the two line up with no glue.
 
-**Never submits.** A human attaches the signed build and presses Submit. Don't try to work around this.
+**Never submits for review; never ships to the public.** It *does* upload builds — `prerelease` sends
+the `.ipa` to TestFlight (internal groups) or the `.aab` to a Play closed track, and points the version
+being prepared at it. What stays human: pressing Submit, Play `production`, and external TestFlight
+(which needs Beta App Review). Those are refusals rather than flags, so there is no argument
+combination that reaches the public. Don't try to work around that.
 
 ## Setup
 

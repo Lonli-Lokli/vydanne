@@ -75,7 +75,8 @@ try {
 }
 
 function usage() {
-  return `vydanne ${VERSION} — App Store Connect submission prep (companion to zdymak). Never submits.
+  return `vydanne ${VERSION} — App Store Connect + Play prep (companion to zdymak). Ships builds to
+testers; never submits for review.
 usage: vydanne <command> [--config vydanne.config.mjs]
   fill            metadata + screenshots + previews (native; iOS & macOS separate)
   age-rating      set the age rating (AppInfo declaration)

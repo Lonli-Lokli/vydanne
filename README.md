@@ -7,7 +7,9 @@ description, keywords, screenshots… once per language, twice per store, again 
 box and the store quietly shows a blank page to half the world. Get a folder name wrong and the whole
 upload fails.
 
-vydanne does that typing for you, then **checks your work before Apple or Google does**.
+vydanne does that typing for you, then **checks your work before Apple or Google does** — and puts
+your build in front of testers on both stores. It stops at the one step that should stay a human's:
+it never submits for review, and never ships to the public.
 
 > *выданне* (Belarusian) — "publishing".
 
@@ -313,8 +315,12 @@ don't have to learn them the hard way.
 
 ## What vydanne will never do
 
-- **It never submits your app.** A human attaches the build and presses Submit. That's on purpose.
-- It doesn't build, sign, or upload your app binary.
+- **It never submits for review, and never ships to the public.** It *will* put a build in front of
+  your testers — TestFlight internal, or a Play closed track — and point the version you are
+  preparing at it. Pressing Submit, promoting to Play production, and distributing to external
+  TestFlight (which needs Beta App Review) all stay yours. Those are refusals, not flags: there is
+  no argument combination that reaches the public.
+- It doesn't build or sign your binary. It uploads the `.ipa` / `.aab` you already produced.
 - It doesn't create the app record — make that in App Store Connect / Play Console first.
 
 <br>

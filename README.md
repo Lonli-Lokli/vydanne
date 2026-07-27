@@ -174,7 +174,7 @@ Run vydanne **from your project folder** — it finds everything relative to whe
 | `locales` | Lists your languages and Apple's code for each — and warns about any language the App Store doesn't offer. |
 | `age-rating` | Sets the age rating. |
 | `review-contact` | Fills in the App Review contact details (who Apple calls if there's a problem). |
-| `accessibility` | Saves Accessibility Nutrition Labels. Stays a draft until your app is live. |
+| `accessibility` | Saves Accessibility Nutrition Labels from the `accessibility` block in your config. Stays a draft until your app is live. Refuses to run if you have not declared one — see below. |
 | `privacy` | Prints the privacy answers to paste into Apple's website (Apple's privacy section has no API). |
 | `iap` | Checks your in-app purchase text fits, and can strip transparency from an image. |
 | `compliance` | Generates the US encryption self-classification PDF that Apple asks for. |
@@ -293,3 +293,34 @@ goes through the Google Play Developer **Edits** API.
 Releasing a new version: [RELEASING.md](RELEASING.md).
 
 MIT.
+
+
+### Accessibility Nutrition Labels
+
+Every other thing vydanne writes is a *fact* about your app. This one is a **claim about its
+behaviour**, made to Apple — so the tool will not guess it for you.
+
+```js
+accessibility: {
+  voiceover: true,
+  voiceControl: true,
+  largerText: true,
+  sufficientContrast: true,
+  darkInterface: true,
+  differentiateWithoutColorAlone: true,
+  reducedMotion: true,
+  captions: false,
+  audioDescriptions: false,
+},
+```
+
+Every feature is stated explicitly. An omission would read as a quiet "no", which is just as
+unverified as a quiet "yes", so a partial block is rejected along with a missing one.
+
+Earlier versions applied one hardcoded matrix to every app, which meant an app inherited claims
+nobody had checked against it. At least one shipped app declared Larger Text support while its
+board glyphs scaled twice and grew off the high-contrast disc behind them. If you are upgrading,
+audit before you declare.
+
+Apple's platform caveats are still applied automatically: Larger Text does not exist on macOS and
+Voice Control does not exist on watchOS, so those are sent as false whatever you declare.

@@ -4,6 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/vydanne.svg)](https://www.npmjs.com/package/vydanne)
 [![node](https://img.shields.io/node/v/vydanne.svg)](https://nodejs.org)
 [![license](https://img.shields.io/npm/l/vydanne.svg)](LICENSE)
+[![companion: zdymak](https://img.shields.io/badge/companion-zdymak-6e40c9?logo=github)](https://github.com/Lonli-Lokli/zdymak)
 
 **Fill in your app's App Store and Google Play listing — in every language — from files on your computer.**
 

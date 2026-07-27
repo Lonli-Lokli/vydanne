@@ -129,7 +129,19 @@ async function uploadScreenshots(config, client, platform, verLocs) {
     const { json: sets } = await client.get(`/v1/appStoreVersionLocalizations/${loc.id}/appScreenshotSets?include=appScreenshots&limit=50`);
     for (const [dt, list] of Object.entries(byDev)) {
       let set = (sets.data || []).find((s) => s.attributes.screenshotDisplayType === dt);
-      if (set && (set.relationships?.appScreenshots?.data || []).length) continue; // never duplicate
+      // A populated slot used to `continue` unconditionally — "never duplicate", but it also meant a
+      // re-render could NEVER reach a listing that already had images, and because the skip happened
+      // before the log below, `fill` reported success having uploaded nothing. Same shape as previews
+      // now, and the same VYDANNE_REPLACE flag rather than a second one for the other asset kind.
+      const existing = set?.relationships?.appScreenshots?.data || [];
+      if (existing.length && process.env.VYDANNE_REPLACE !== "1") {
+        console.log(yellow(`    ${code}/${dt}: already has ${existing.length}, skipping (set VYDANNE_REPLACE=1 to replace)`));
+        continue;
+      }
+      for (const s of existing) { // VYDANNE_REPLACE: drop the old shots so the new upload takes their place
+        await client.del(`/v1/appScreenshots/${s.id}`);
+        console.log(yellow(`    ${code}/${dt}: ${client.dryRun ? "would remove" : "removed"} old screenshot ${s.id}`));
+      }
       if (!set) { const c = await client.post(`/v1/appScreenshotSets`, { data: { type: "appScreenshotSets", attributes: { screenshotDisplayType: dt }, relationships: { appStoreVersionLocalization: { data: { type: "appStoreVersionLocalizations", id: loc.id } } } } }); set = c.json.data; }
       for (const f of list) await uploadAsset(client, { type: "appScreenshots", setType: "appScreenshotSet", setId: set.id, filePath: path.join(base, code, f) });
       console.log(green(`    ${code}/${dt}: ${list.length} screenshots`));

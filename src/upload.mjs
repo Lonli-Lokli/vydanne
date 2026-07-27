@@ -2,7 +2,9 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-const md5 = (buf) => crypto.createHash("md5").update(buf).digest("hex");
+// Exported because `diff` compares against it: the checksum committed here is the only thing that lets
+// a local file be compared to what Apple actually holds, rather than to how MANY things it holds.
+export const md5 = (buf) => crypto.createHash("md5").update(buf).digest("hex");
 
 // Native ASC asset upload (what spaceship does internally): reserve the asset (returns pre-signed
 // uploadOperations) -> PUT each chunk -> commit with uploaded:true + the MD5 checksum.

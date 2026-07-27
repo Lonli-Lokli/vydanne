@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { green, yellow, red } from "../util.mjs";
 import { VALID } from "../locales.mjs";
+import { md5 } from "../upload.mjs";
 
 // [asc attribute, local metadata filename, isLongText]
 const VERSION_FIELDS = [
@@ -87,14 +88,54 @@ async function mediaDiff(config, client, platform, verLocs) {
   const dev = platform === "MAC_OS" ? MAC_DEVICE : IOS_DEVICE;
   const base = platform === "MAC_OS" ? "fastlane/screenshots-macos" : "fastlane/screenshots";
   const localDir = path.join(base, config.primaryLocale);
+  // Compared by CONTENT, not by count. Counting was actively misleading: re-rendering every screenshot
+  // leaves three-local-vs-three-remote, so `diff` said "in sync" about a listing showing the old images —
+  // and `fill` skipped the populated slots, so both commands agreed there was nothing to do. The checksum
+  // is already there to compare against: `upload.mjs` commits md5(bytes) as `sourceFileChecksum`.
   const local = {};
-  if (fs.existsSync(localDir)) for (const f of fs.readdirSync(localDir).filter((f) => f.endsWith(".png"))) { const dt = dev[f.split("_")[0]]; if (dt) local[dt] = (local[dt] || 0) + 1; }
+  if (fs.existsSync(localDir)) {
+    for (const f of fs.readdirSync(localDir).filter((f) => f.endsWith(".png")).sort()) {
+      const dt = dev[f.split("_")[0]];
+      if (dt) (local[dt] ||= new Map()).set(f, md5(fs.readFileSync(path.join(localDir, f))));
+    }
+  }
   const { json: sets } = await client.get(`/v1/appStoreVersionLocalizations/${primary.id}/appScreenshotSets?include=appScreenshots&limit=50`);
+  // `include=appScreenshots` returns the shots as full resources in `included`; the set's relationships
+  // carry ids only, so the attributes (fileName, sourceFileChecksum) have to be picked up from there.
+  const shotsById = new Map((sets.included || []).filter((r) => r.type === "appScreenshots").map((r) => [r.id, r.attributes || {}]));
   const remote = {};
-  for (const s of sets.data || []) remote[s.attributes.screenshotDisplayType] = (s.relationships?.appScreenshots?.data || []).length;
+  for (const s of sets.data || []) {
+    const m = new Map();
+    for (const ref of s.relationships?.appScreenshots?.data || []) {
+      const a = shotsById.get(ref.id);
+      if (a) m.set(a.fileName, a.sourceFileChecksum ?? null);
+      else m.set(ref.id, null); // not included — treat as present but unverifiable
+    }
+    remote[s.attributes.screenshotDisplayType] = m;
+  }
   for (const dt of new Set([...Object.keys(local), ...Object.keys(remote)])) {
-    const L = local[dt] || 0, R = remote[dt] || 0;
-    if (L !== R) { diffs++; console.log(`  ${yellow("screenshots")} ${dt.replace("APP_", "")}: local ${L} / remote ${R}  (@${config.primaryLocale})`); }
+    const L = local[dt] || new Map();
+    const R = remote[dt] || new Map();
+    const label = `  ${yellow("screenshots")} ${dt.replace("APP_", "")}`;
+    if (L.size !== R.size) {
+      diffs++;
+      console.log(`${label}: local ${L.size} / remote ${R.size}  (@${config.primaryLocale})`);
+      continue;
+    }
+    // Same count — so the only thing that can distinguish them is what the bytes are.
+    const changed = [...L].filter(([name, sum]) => R.has(name) && R.get(name) !== null && R.get(name) !== sum).map(([name]) => name);
+    const renamed = [...L.keys()].filter((name) => !R.has(name));
+    const unverifiable = [...L].filter(([name]) => R.has(name) && R.get(name) === null).map(([name]) => name);
+    if (renamed.length) {
+      diffs++;
+      console.log(`${label}: ${renamed.length} not on the store by name (${renamed.slice(0, 3).join(", ")})  (@${config.primaryLocale})`);
+    } else if (changed.length) {
+      diffs++;
+      console.log(`${label}: ${changed.length} of ${L.size} differ in content (${changed.slice(0, 3).join(", ")})  (@${config.primaryLocale})`);
+    } else if (unverifiable.length) {
+      // Apple did not give a checksum back. Say so rather than reporting a match we did not establish.
+      console.log(`${label}: ${unverifiable.length} present, checksum not reported by Apple — content unverified`);
+    }
   }
   const { json: psets } = await client.get(`/v1/appStoreVersionLocalizations/${primary.id}/appPreviewSets?include=appPreviews&limit=50`);
   const remotePrev = {};

@@ -98,8 +98,9 @@ before the **first underscore** selects the device slot; files upload in sorted 
 | `watch_` | `APP_WATCH_ULTRA` |
 | `macos_` | `APP_DESKTOP` (in `screenshots-macos/`) |
 
-An unknown prefix is silently ignored. A set that **already has screenshots is skipped**, never
-duplicated — to replace shots, delete them in ASC first. PNGs must be **RGB with no alpha**.
+A file with an unknown prefix is not uploaded, and `fill` names it. A set that **already has
+screenshots is skipped** (and says so), never duplicated — `VYDANNE_REPLACE=1` deletes the store's set
+and uploads yours, the same flag `previews` uses. PNGs must be **RGB with no alpha**.
 
 **Play listing text** — `<google.metadataDir>/<PLAY-locale>/{title,short_description,full_description}.txt`
 (30 / 80 / 4000). Play uses its **own** codes (`de-DE`, `zh-CN`, `iw-IL`, `ar`, `be`) — *not* Apple's
@@ -268,8 +269,10 @@ through that client. **A new command that touches the store must be marked `writ
 `src/registry.mjs`** — that flag is the whole opt-in, not a label.
 
 **Env toggles:** `VYDANNE_CONFIG` · `VYDANNE_SKIP_METADATA` / `VYDANNE_SKIP_SCREENSHOTS` (fill) ·
-`VYDANNE_REPLACE` (previews) · `VYDANNE_FLATTEN=<png>` (iap) · `VYDANNE_A11Y_PUBLISH` (accessibility) ·
-`VYDANNE_COMMIT=1` (legacy alias for `--apply`; prefer the flag).
+`VYDANNE_REPLACE` (fill screenshots + previews: replace populated slots) · `VYDANNE_VERSION` (prepare) ·
+`VYDANNE_IPA` / `VYDANNE_AAB` / `VYDANNE_TRACK` / `VYDANNE_RELEASE_NAME` (prerelease) ·
+`VYDANNE_FLATTEN=<png>` (iap) · `VYDANNE_A11Y_PUBLISH` (accessibility) · `VYDANNE_ALLOW_CROSS_STORE`
+(one run past the cross-store lint) · `VYDANNE_COMMIT=1` (legacy alias for `--apply`; prefer the flag).
 
 ## Flow
 

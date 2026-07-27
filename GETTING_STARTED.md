@@ -20,10 +20,10 @@ submit anything for review.
 | vydanne does | You (or your developer) still do |
 |---|---|
 | Write/push the store text in every language | **Create the app record** in App Store Connect / Play Console |
-| Upload screenshots, app previews, Play graphics | **Build and upload the binary** (`.ipa` / `.aab`) |
-| Set age rating, App Review contact, IAP text | Answer **App Privacy** in Apple's web UI (see [step 9](#9-finish-in-the-browser-the-parts-no-api-can-do)) |
-| Generate the US export-compliance PDF | Play **Data Safety** + content-rating questionnaires |
-| Check everything is complete (`preflight`) | **Press Submit for Review** |
+| Upload screenshots, app previews, Play graphics | **Build and sign the binary** (`.ipa` / `.aab`) |
+| Upload that binary to testers (`prerelease`: TestFlight internal / a Play testing track) | Answer **App Privacy** in Apple's web UI (see [step 9](#9-finish-in-the-browser-the-parts-no-api-can-do)) |
+| Set age rating, App Review contact, IAP text | Play **Data Safety** + content-rating questionnaires |
+| Generate the US export-compliance PDF · check everything is complete (`preflight`) | **Press Submit for Review** |
 
 > **It never submits.** That's deliberate — a human should always be the one who ships.
 
@@ -305,8 +305,8 @@ fastlane/metadata/android/
    └─ full_description.txt   (≤4000)
 ```
 
-Play images are read from **fixed paths** (they're where [zdymak](https://www.npmjs.com/package/zdymak)
-writes them). Each is uploaded only if the file exists, so a missing set never wipes what's live:
+Play images are read from **fixed paths**. Each is uploaded only if the file exists, so a missing set
+never wipes what's live:
 
 | Play asset | Path vydanne reads |
 |---|---|
@@ -317,6 +317,12 @@ writes them). Each is uploaded only if the file exists, so a missing set never w
 | 10″ tablet screenshots | `marketing/out/play-tablet-plain/` |
 
 *(These paths are not configurable yet — create the folders at those locations, or symlink them.)*
+
+> **Capturing with [zdymak](https://www.npmjs.com/package/zdymak)?** Its output layout is different
+> from all of the above (one `store-assets/` tree, short locale codes, numbered filenames). Run
+> **`npx vydanne bridge`** after every capture — it renames and files everything into the Apple and
+> Play layouts on this page, holds back screenshots for locales that have no listing text yet, and
+> refuses images with an alpha channel before Apple can. `--dry-run` shows what it would do.
 
 ---
 
@@ -345,40 +351,46 @@ separate ANSSI declaration.
 
 ## 8. Push it to the store
 
-Always look before you leap:
+**Every command that changes a store is a dry run until you add `--apply`** — it prints each write it
+would make and sends nothing. So the safe rhythm is always: run it, read the plan, run it again with
+`--apply`.
+
+The whole Apple release is one command, which runs the seven steps in the only order that works
+(`prepare` → `fill` → `previews` → `age-rating` → `review-contact` → `accessibility` → `preflight`) and
+stops at the first problem:
 
 ```sh
-npx vydanne preflight     # is anything missing or over a character limit?
 npx vydanne diff          # exactly what would change vs what's live now
-```
-
-`preflight` must be **green**. Then:
-
-```sh
-npx vydanne fill          # text + screenshots (iOS and Mac both)
-npx vydanne previews      # App Preview videos
-npx vydanne age-rating
-npx vydanne review-contact
-npx vydanne accessibility # saved as a draft; publishes only once your app is live
+npx vydanne push          # DRY RUN of the whole pipeline — read it
+npx vydanne push --apply  # do it; ends at a green preflight
 npx vydanne privacy       # prints the answers to type into Apple's web UI
 ```
 
-**For Google Play**, `fill` is a **dry run by default** — it validates and throws the change away so a
-half-finished local folder can't overwrite your live listing:
+Each step is also its own command (`npx vydanne fill --apply`, etc.) if you prefer to go one at a time.
+Two things worth knowing:
+
+- **Updating an app that's already live?** The draft version to write into doesn't exist until
+  `prepare` creates it — `push` runs it first, or run `npx vydanne prepare --apply` yourself. Without
+  it, `fill` refuses rather than touching the listing your customers are reading.
+- **Replacing screenshots or previews that are already on the store** needs `VYDANNE_REPLACE=1` — by
+  default a populated slot is skipped (and says so), never overwritten.
+
+**For Google Play**, the same `--apply` rule applies — a dry run validates against Google for real,
+then throws the change away, so a half-finished local folder can't overwrite your live listing:
 
 ```sh
 # macOS / Linux
-npx vydanne fill --store google                    # dry run: shows what would happen
-VYDANNE_COMMIT=1 npx vydanne fill --store google   # actually commit it
+npx vydanne fill --store google            # dry run: shows what would happen
+npx vydanne fill --store google --apply    # actually commit it
 ```
 ```powershell
-# Windows PowerShell — set the variable first; the `VAR=1 command` form does NOT work here
+# Windows PowerShell — same flag, no environment variables needed
 npx vydanne fill --store google
-$env:VYDANNE_COMMIT = "1"; npx vydanne fill --store google
-Remove-Item Env:\VYDANNE_COMMIT          # clear it so later runs stay dry
+npx vydanne fill --store google --apply
 ```
 
-Finally, run `npx vydanne diff` once more and eyeball one screenshot per platform in the web UI.
+Finally, run `npx vydanne diff` once more — it compares text *and* image content against the store —
+and eyeball one screenshot per platform in the web UI.
 
 ---
 
@@ -386,7 +398,9 @@ Finally, run `npx vydanne diff` once more and eyeball one screenshot per platfor
 
 1. **App Privacy** (Apple) — Apple's privacy API isn't reachable with an API key, so `vydanne privacy`
    prints the exact answers; you paste them into App Store Connect by hand.
-2. **Upload the binary** — Xcode, Transporter, or your CI. vydanne never touches your build.
+2. **Build the binary** — Xcode / Gradle, as usual. `npx vydanne prerelease --apply` can then upload it
+   for you (TestFlight internal groups, or a Play testing track). Shipping it to the *public* stays in
+   the consoles, always.
 3. **Play Data Safety + content rating** — questionnaires in the Play Console.
 4. **Submit for Review** — yours to press.
 
@@ -400,13 +414,13 @@ Finally, run `npx vydanne diff` once more and eyeball one screenshot per platfor
 | `ASC key not found at …` | The `.p8` isn't where vydanne looks. | The error prints the exact path it wants — move the file there. List it with `ls ~/.appstoreconnect/private_keys/` (macOS/Linux) or `dir "$env:USERPROFILE\.appstoreconnect\private_keys"` (Windows). |
 | `app '…' not found for this ASC key` | The bundle ID is wrong, or the key's team doesn't own the app. | Check `bundleId` matches App Store Connect exactly. |
 | `401` / `403` from Apple | Key lacks permission, or the IDs are swapped. | Key access must be **App Manager**+. Confirm `ASC_KEY_ID` vs `ASC_ISSUER_ID` aren't reversed. |
-| `no editable version` | There's no version in an editable state. | In App Store Connect, create the next version (e.g. "1.0 Prepare for Submission"). |
+| `no editable version` | The only version is live (read-only) and no draft exists yet. | `npx vydanne prepare --apply` creates the next version — that's its job. |
 | A locale was ignored | The folder name isn't an Apple code. | Run `npx vydanne locales` and rename the folder to the code shown. |
-| Screenshots didn't upload | Wrong filename prefix, or the slot already has images. | Use the prefix table above. vydanne never overwrites a set that already has screenshots. |
-| Apple rejects a screenshot | It has an alpha channel. | Flatten to RGB — macOS/Linux: `VYDANNE_FLATTEN=shot.png npx vydanne iap` · Windows: `$env:VYDANNE_FLATTEN="shot.png"; npx vydanne iap`. |
-| `VYDANNE_… =1` "does nothing" on Windows | PowerShell doesn't support the Unix `VAR=1 command` form. | Set it first: `$env:VYDANNE_COMMIT = "1"`, then run the command. |
+| Screenshots didn't upload | Wrong filename prefix, or the slot already has images. | `fill` now names both cases in its output. Use the prefix table above; to replace an already-populated slot, re-run with `VYDANNE_REPLACE=1`. |
+| Apple rejects a screenshot | It has an alpha channel. | Flatten to RGB — macOS/Linux: `VYDANNE_FLATTEN=shot.png npx vydanne iap` · Windows: `$env:VYDANNE_FLATTEN="shot.png"; npx vydanne iap`. (`bridge` checks this for you.) |
+| `VYDANNE_… =1` "does nothing" on Windows | PowerShell doesn't support the Unix `VAR=1 command` form. | Set it first: `$env:VYDANNE_REPLACE = "1"`, then run the command. |
 | `no google block in config` | Play isn't configured. | Add the `google` block and set `PLAY_JSON_KEY_FILE`. |
-| Play changes didn't stick | `fill --store google` is dry by default. | Re-run with `VYDANNE_COMMIT=1`. |
+| Play changes didn't stick | Store-changing commands are dry by default. | Re-run with `--apply`. |
 | `accessibility` returns 409 | Labels can't publish before the app is live. | Leave it as a draft; publish after launch with `VYDANNE_A11Y_PUBLISH=1`. |
 
 ---
@@ -419,10 +433,14 @@ Finally, run `npx vydanne diff` once more and eyeball one screenshot per platfor
 | `PLAY_JSON_KEY_FILE` | Path to the Play service-account JSON (**required for Play**). |
 | `VYDANNE_CONFIG` | Use a different config file (same as `--config`). |
 | `VYDANNE_SKIP_METADATA` / `VYDANNE_SKIP_SCREENSHOTS` | `fill`: push only one half. |
-| `VYDANNE_COMMIT=1` | `fill --store google`: actually commit (otherwise dry). |
-| `VYDANNE_REPLACE=1` | `previews`: delete the existing preview and upload a new one. |
+| `VYDANNE_REPLACE=1` | `fill` / `previews`: delete what's in an already-populated slot and upload yours. |
+| `VYDANNE_VERSION=<x>` | `prepare`: name the version when it's created before its build exists. |
+| `VYDANNE_IPA=<path>` / `VYDANNE_AAB=<path>` | `prerelease`: override where the binary is found. |
+| `VYDANNE_TRACK` / `VYDANNE_RELEASE_NAME` | `prerelease --store google`: testing track / release name. |
 | `VYDANNE_FLATTEN=<png>` | `iap`: convert an image to RGB (removes transparency). |
 | `VYDANNE_A11Y_PUBLISH=1` | `accessibility`: publish the labels (only once the app is live). |
+| `VYDANNE_ALLOW_CROSS_STORE=1` | Skip the other-store-mention check for one run. |
+| `VYDANNE_COMMIT=1` | Legacy alias for `--apply` — prefer the flag. |
 
 Set them with `export NAME=value` on macOS/Linux, or `$env:NAME = "value"` in Windows PowerShell.
 

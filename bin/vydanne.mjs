@@ -142,7 +142,8 @@ usage: vydanne <command> [--apply] [--config vydanne.config.mjs]
 credentials: env > .env cascade (.env, .env.<mode>, .env.local, .env.<mode>.local) > user config
   (\$VYDANNE_CONFIG_HOME, %APPDATA%\\vydanne or \$XDG_CONFIG_HOME/vydanne, ~/.appstoreconnect).
   NEVER the committed vydanne.config.mjs — run \`vydanne auth\` to see what resolved.
-toggles: VYDANNE_SKIP_METADATA / VYDANNE_SKIP_SCREENSHOTS (fill), VYDANNE_A11Y_PUBLISH (accessibility),
+toggles: VYDANNE_SKIP_METADATA / VYDANNE_SKIP_SCREENSHOTS (fill), VYDANNE_REPLACE=1 (fill/previews:
+         replace populated slots), VYDANNE_VERSION (prepare), VYDANNE_A11Y_PUBLISH (accessibility),
          VYDANNE_PROFILE (named profile), VYDANNE_ENV (.env mode),
          VYDANNE_COMMIT=1 (legacy alias for --apply — prefer the flag)`;
 }

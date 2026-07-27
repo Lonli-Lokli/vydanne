@@ -176,6 +176,22 @@ blocking; `allowCrossStoreTerms: [...]` in the config silences a specific one, a
 `VYDANNE_ALLOW_CROSS_STORE=1` overrides a single run. This is a rejection that surfaces days later in
 one locale out of twenty, so it is checked where it is free to fix.
 
+`prepare` creates the version to write INTO, and is REQUIRED as the first push step on any app that
+already has a version on sale. Every other Apple command finds its target through
+`client.editVersion()`, which returns the first version Apple has not marked dead; when the only
+version is live it has no editable record to return and falls back to the live one — so `fill` aims
+its `description`/`whatsNew` PATCHes at the listing customers are reading, and `prerelease` declines
+to attach the build it just uploaded. `prepare` POSTs `/v1/appStoreVersions` with `releaseType:
+MANUAL` (so approval still doesn't release), sets `copyright` from `<metadataDir>/copyright.txt`
+(nothing else in vydanne writes that version-level field), and attaches the newest build. The version
+number is read off that build's `preReleaseVersion` — the archive's own
+`CFBundleShortVersionString`, so it cannot drift from the binary — or `VYDANNE_VERSION=<x>` when the
+version is being prepared before its build exists. It is find-or-create, so re-running is safe; a
+version Apple has locked (`IN_REVIEW`, `READY_FOR_SALE`, …) is refused rather than edited, because
+withdrawing a submission is the operator's call. It pre-checks the number against the version on sale,
+turning Apple's 409 into a sentence. **Creating a draft is not submitting** — Add to Review and Submit
+stay manual.
+
 `prerelease` uploads the BUILD. On Apple it validates and uploads the `.ipa` to **TestFlight** via
 `xcrun altool` — the one command that shells out, because the ASC REST API has never carried a binary,
 which also makes it macOS-only. `.ipa` comes from `ios.ipa` / `VYDANNE_IPA` (a directory takes its
@@ -202,8 +218,8 @@ The AAB binary and the (YouTube-URL) promo video stay outside vydanne.
 
 ## `--apply` — writes are opt-in
 
-**Every store-mutating command is a DRY RUN without `--apply`**: `fill` · `previews` · `age-rating` ·
-`review-contact` · `accessibility` · `prerelease` (marked `✎` in `vydanne help`). They read the store,
+**Every store-mutating command is a DRY RUN without `--apply`**: `prepare` · `fill` · `previews` ·
+`age-rating` · `review-contact` · `accessibility` · `prerelease` (marked `✎` in `vydanne help`). They read the store,
 print each write they would make, and send nothing. Read-only commands ignore the flag.
 
 Never reach for `--apply` to "check whether it works" — the dry run IS the check, and it walks the whole

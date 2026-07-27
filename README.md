@@ -207,6 +207,7 @@ Two details worth knowing:
 | Command | In plain English |
 |---|---|
 | `preflight` | **Run this first.** Checks the listing is complete, nothing is over a character limit, and no locale mentions the other app store. Green means submittable. |
+| `prepare` | Starts the next release: creates the App Store version you're preparing and attaches your newest build to it. **Needed before `fill` on an app that already has a version on sale** — until a draft exists there is nothing for the listing text to go into. Reuses the draft if it's already there, so it's safe to re-run. It does *not* submit. |
 | `diff` | Shows exactly what's different between your files and what's live. Nothing is changed — a safe preview. |
 | `fill` | Uploads your listing text and screenshots. Handles iPhone, iPad and Mac. Refuses to upload text that names the other mobile platform. |
 | `previews` | Uploads App Preview videos. |
@@ -222,8 +223,31 @@ Two details worth knowing:
 
 For **Google Play**, add `--store google` to `inspect`, `diff`, `preflight`, `fill`, or `prerelease`.
 
-`fill`, `previews`, `age-rating`, `review-contact`, `accessibility` and `prerelease` change the store, so
-they need [`--apply`](#--apply-or-nothing-happens); without it they report and exit.
+`prepare`, `fill`, `previews`, `age-rating`, `review-contact`, `accessibility` and `prerelease` change the
+store, so they need [`--apply`](#--apply-or-nothing-happens); without it they report and exit.
+
+### Shipping an update to an app that's already live
+
+The first release is the easy case: App Store Connect hands you a version in *Prepare for Submission* and
+every command has something to write into. After that version goes on sale, it doesn't — a live version is
+read-only, and there is no draft until someone makes one. That's what `prepare` is for:
+
+```sh
+npx vydanne prepare --apply       # create version 1.2, attach the newest build
+npx vydanne fill --apply          # listing text + screenshots, into 1.2
+npx vydanne preflight             # green means submittable
+# then, in App Store Connect: Add to Review -> Submit
+```
+
+Skip `prepare` and `fill` has nowhere valid to aim: it falls back to the version **on sale** and tries to
+rewrite the listing your customers are reading. Run `prepare` first and that stops being possible.
+
+The version number comes from the newest build's own `CFBundleShortVersionString`, so it can't drift from
+the binary. Preparing a version before its build exists is the one case that needs telling:
+
+```sh
+VYDANNE_VERSION=1.2 npx vydanne prepare --apply
+```
 
 <br>
 

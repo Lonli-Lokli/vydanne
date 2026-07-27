@@ -207,8 +207,9 @@ async function assignToInternalGroup(client, build, groupName) {
   else console.error(yellow(`  could not add to "${groupName}" (${r.status})`));
 }
 
-/** Versions Apple will not let us re-point without the operator withdrawing them first. */
-const LOCKED_STATES = new Set([
+/** Versions Apple will not let us re-point without the operator withdrawing them first. Exported
+ *  because `prepare` needs the same answer about the same states — two lists would drift. */
+export const LOCKED_STATES = new Set([
   "WAITING_FOR_REVIEW",
   "IN_REVIEW",
   "PENDING_DEVELOPER_RELEASE",
@@ -222,12 +223,17 @@ const LOCKED_STATES = new Set([
  *
  * This is what makes "upload a fix and try again" one command rather than a trip to the web UI:
  * the version → build relationship holds exactly one build, so a PATCH re-points it.
+ *
+ * [known] is the version to attach to, when the caller has already resolved it. `prepare` passes the
+ * draft it just found or created, because `editVersion()` cannot tell a fresh draft from the live
+ * record on an app that already has a version on sale — it returns whichever the list yields first.
  */
-export async function pointVersionAtBuild(client, config, build) {
+export async function pointVersionAtBuild(client, config, build, known = null) {
   const platform = (config.platforms && config.platforms[0]) || "IOS";
-  const version = await client.editVersion(platform);
+  const version = known || (await client.editVersion(platform));
   if (!version) {
     console.log(yellow("  no editable App Store version — build uploaded, nothing to attach it to."));
+    console.log("  `vydanne prepare --apply` creates the version to attach it to, then re-run this.");
     return;
   }
   const state = version.attributes.appStoreState;

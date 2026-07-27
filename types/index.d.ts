@@ -5,6 +5,13 @@ export type Platform = 'IOS' | 'MAC_OS';
 
 /** Every vydanne CLI command (kept in sync with src/registry.mjs by scripts/check-types.mjs). */
 export type CommandName =
+  /**
+   * Create (or reuse) the App Store version being prepared and attach the newest build to it.
+   * Lands in PREPARE_FOR_SUBMISSION with `releaseType: MANUAL` — it does not submit for review.
+   * Required first on an app with a version already on sale: only then does a draft exist for
+   * `fill` to write into. Override the version with VYDANNE_VERSION.
+   */
+  | 'prepare'
   | 'fill'
   | 'age-rating'
   | 'review-contact'

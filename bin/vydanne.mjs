@@ -107,6 +107,10 @@ usage: vydanne <command> [--apply] [--config vydanne.config.mjs]
   --apply         PERFORM the writes. Without it every store-mutating command below (marked ✎) runs
                   as a DRY RUN: it reads the store, reports exactly what it would change, and sends
                   nothing. Read-only commands ignore the flag.
+✎ prepare         create/reuse the editable App Store version and attach the uploaded build.
+                  Run this FIRST on an app that already has a version on sale — until it has,
+                  there is no draft for \`fill\` to write into. Never submits; VYDANNE_VERSION=<x>
+                  to name the version instead of reading it off the newest build.
 ✎ fill            metadata + screenshots + previews (native; iOS & macOS separate)
 ✎ age-rating      set the age rating (AppInfo declaration)
 ✎ review-contact  App Review contact from the gitignored files

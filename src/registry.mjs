@@ -10,6 +10,10 @@
 // the STORE specifically — `privacy` and `compliance` write local files (a record, a PDF) and are not
 // marked, because a dry run that refused to produce a local artefact would just be broken.
 export const COMMANDS = {
+  // Creates the editable version everything below writes INTO, so it comes first in more than
+  // listing order: on an app with a version already on sale, `fill` has nothing valid to target
+  // until this has run once.
+  prepare: { mod: "prepare", client: true, writes: true },
   fill: { mod: "fill", client: true, writes: true },
   "age-rating": { mod: "ageRating", client: true, writes: true },
   "review-contact": { mod: "reviewContact", client: true, writes: true },

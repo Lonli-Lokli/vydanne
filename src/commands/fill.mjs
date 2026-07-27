@@ -134,10 +134,18 @@ async function uploadScreenshots(config, client, platform, verLocs) {
   if (!fs.existsSync(base)) return;
   for (const code of fs.readdirSync(base).filter((d) => VALID.has(d))) {
     const loc = verLocs.find((l) => l.attributes.locale === code);
-    if (!loc) continue;
+    // Said, not skipped: with VYDANNE_SKIP_METADATA=1 (or a screenshots folder for a locale that has no
+    // metadata folder) no localization was created above, and a silent `continue` here reports success
+    // for a locale whose screenshots never left the disk.
+    if (!loc) { console.log(yellow(`    ${code}: no App Store localization — screenshots skipped (run fill with metadata to create it)`)); continue; }
     const files = fs.readdirSync(path.join(base, code)).filter((f) => f.endsWith(".png")).sort();
     const byDev = {};
-    for (const f of files) { const dt = DEV[f.split("_")[0]]; if (dt) (byDev[dt] ||= []).push(f); }
+    const unknown = [];
+    for (const f of files) { const dt = DEV[f.split("_")[0]]; dt ? (byDev[dt] ||= []).push(f) : unknown.push(f); }
+    // The prefix before the first underscore selects the device slot; a file with an unknown one used to
+    // vanish without a word — the docs even said "if a screenshot doesn't appear, check the name first",
+    // which is the tool telling the user to do its job. Name the files instead.
+    if (unknown.length) console.log(yellow(`    ${code}: ${unknown.length} file(s) with no device prefix, not uploaded: ${unknown.slice(0, 3).join(", ")}${unknown.length > 3 ? ", …" : ""} (known: ${Object.keys(DEV).join(", ")})`));
     const { json: sets } = await client.get(`/v1/appStoreVersionLocalizations/${loc.id}/appScreenshotSets?include=appScreenshots&limit=50`);
     for (const [dt, list] of Object.entries(byDev)) {
       let set = (sets.data || []).find((s) => s.attributes.screenshotDisplayType === dt);

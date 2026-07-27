@@ -8,6 +8,9 @@ import { uploadAsset, setPreviewPoster } from "../upload.mjs";
 export async function run(config, client) {
   await client.findApp(config.bundleId);
   const specs = config.previews || defaultSpecs(config);
+  // defaultSpecs filters to files that exist, so with no `previews` config and no video on disk this
+  // command used to print NOTHING and exit 0 — indistinguishable from a successful upload in a CI log.
+  if (!specs.length) console.log(yellow("  no previews configured and none found at the default paths — nothing to upload."));
   for (const s of specs) {
     const v = await client.editVersion(s.platform);
     if (!v) {
@@ -18,7 +21,9 @@ export async function run(config, client) {
     const locs = await client.versionLocalizations(v.id);
     for (const code of s.locales || [config.primaryLocale]) {
       const loc = locs.find((l) => l.attributes.locale === code);
-      if (!loc) continue;
+      // A configured locale the version doesn't have must be said, not skipped — the spec NAMES this
+      // locale, so silence here reports success for a preview that never left the disk.
+      if (!loc) { console.error(red(`  ${s.platform}/${code}: no App Store localization — preview skipped (run \`fill\` to create it)`)); continue; }
       try {
         const { json: sets } = await client.get(`/v1/appStoreVersionLocalizations/${loc.id}/appPreviewSets?include=appPreviews&limit=50`);
         let set = (sets.data || []).find((x) => x.attributes.previewType === s.type);

@@ -22,8 +22,12 @@ export async function loadConfig(p) {
   };
   const creds = resolveCredentials(raw, path.dirname(file));
   for (const w of creds.warnings) console.warn(`\x1b[33mvydanne: ${w}\x1b[0m`);
+  // No `raw` passthrough, deliberately. It was assigned here and read by nothing — an attractive
+  // nuisance rather than dead weight: while `config.ios` sat unassigned (the bug check-config.mjs now
+  // guards), `config.raw.ios` WAS populated, so "fixing" a caller by reading through `raw` would have
+  // entrenched the dropped key instead of exposing it. Everything a command may read is an explicit
+  // key below, where the guard can see it.
   const c = {
-    raw,
     credentials: creds,
     bundleId: need("bundleId"),
     primaryLocale: need("primaryLocale"),

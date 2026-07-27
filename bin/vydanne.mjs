@@ -15,6 +15,14 @@ const i = argv.indexOf("--config");
 const cfgPath = i >= 0 ? argv[i + 1] : undefined;
 const si = argv.indexOf("--store");
 const store = si >= 0 ? argv[si + 1] : "apple";
+// Validated, because the dispatch below only tests `store === "google"`: a typo (`--store goole`) or a
+// missing value (`--store --apply`) would otherwise fall through to the APPLE branch and aim the command
+// at the other store — the worst possible reading of a mistyped argument, and a silent one, since every
+// Apple command runs happily from a repo configured for both.
+if (store !== "apple" && store !== "google") {
+  console.error(`\x1b[31mvydanne: unknown --store '${store}' (expected: apple, google)\x1b[0m`);
+  process.exit(1);
+}
 
 // SAFE BY DEFAULT. Every store-mutating command is a dry run unless `--apply` is passed. The Play half
 // always worked this way (VYDANNE_COMMIT=1, enforceable because an Edit can be discarded); the Apple half

@@ -58,7 +58,11 @@ export async function run(config, client) {
     for (const [type, src, kind] of IMAGES) {
       if (!fs.existsSync(src)) continue;
       const files = kind === "dir" ? fs.readdirSync(src).filter((f) => /\.(png|jpe?g)$/i.test(f)).sort().map((f) => path.join(src, f)) : [src];
-      if (!files.length) continue;
+      // A dir that EXISTS but is empty is different from a missing one: someone (the store-assets
+      // bridge, when zdymak stops producing a form factor) deliberately emptied it, expecting the live
+      // set to follow. It doesn't — never-delete-by-omission holds — but that must be said, because the
+      // silent skip is how a listing keeps showing screenshots of a UI the app no longer has.
+      if (!files.length) { console.log(yellow(`  ${lang}/${type}: local dir is empty — live set left untouched (delete it in Play Console if it is stale)`)); continue; }
       await client.deleteAllImages(editId, lang, type);
       for (const f of files) await client.uploadImage(editId, lang, type, f);
       console.log(green(`  ${lang}/${type}: ${files.length} image(s)`));

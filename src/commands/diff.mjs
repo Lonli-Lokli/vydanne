@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { green, yellow, red } from "../util.mjs";
 import { VALID } from "../locales.mjs";
-import { md5 } from "../upload.mjs";
+import { localScreenshots, remoteScreenshots, compareShots } from "../screenshots.mjs";
 
 // [asc attribute, local metadata filename, isLongText]
 const VERSION_FIELDS = [
@@ -10,8 +10,6 @@ const VERSION_FIELDS = [
   ["whatsNew", "release_notes", true], ["marketingUrl", "marketing_url", false], ["supportUrl", "support_url", false],
 ];
 const INFO_FIELDS = [["name", "name", false], ["subtitle", "subtitle", false]];
-const IOS_DEVICE = { iphone69: "APP_IPHONE_67", iphone65: "APP_IPHONE_65", ipad13: "APP_IPAD_PRO_3GEN_129", watch: "APP_WATCH_ULTRA" };
-const MAC_DEVICE = { macos: "APP_DESKTOP" };
 
 const norm = (s) => (s == null ? null : String(s).replace(/\r/g, "").replace(/\n+$/, "").trim());
 const short = (s, n = 24) => { s = String(s).replace(/\n/g, " "); return s.length > n ? s.slice(0, n) + "…" : s; };
@@ -88,56 +86,26 @@ async function mediaDiff(config, client, platform, verLocs) {
   const primary = verLocs.find((l) => l.attributes.locale === config.primaryLocale);
   if (!primary) return 0;
   let diffs = 0;
-  const dev = platform === "MAC_OS" ? MAC_DEVICE : IOS_DEVICE;
-  const base = platform === "MAC_OS" ? "fastlane/screenshots-macos" : "fastlane/screenshots";
-  const localDir = path.join(base, config.primaryLocale);
-  // Compared by CONTENT, not by count. Counting was actively misleading: re-rendering every screenshot
-  // leaves three-local-vs-three-remote, so `diff` said "in sync" about a listing showing the old images —
-  // and `fill` skipped the populated slots, so both commands agreed there was nothing to do. The checksum
-  // is already there to compare against: `upload.mjs` commits md5(bytes) as `sourceFileChecksum`.
-  const local = {};
-  if (fs.existsSync(localDir)) {
-    for (const f of fs.readdirSync(localDir).filter((f) => f.endsWith(".png")).sort()) {
-      const dt = dev[f.split("_")[0]];
-      if (dt) (local[dt] ||= new Map()).set(f, md5(fs.readFileSync(path.join(localDir, f))));
-    }
-  }
-  const { json: sets } = await client.get(`/v1/appStoreVersionLocalizations/${primary.id}/appScreenshotSets?include=appScreenshots&limit=50`);
-  // `include=appScreenshots` returns the shots as full resources in `included`; the set's relationships
-  // carry ids only, so the attributes (fileName, sourceFileChecksum) have to be picked up from there.
-  const shotsById = new Map((sets.included || []).filter((r) => r.type === "appScreenshots").map((r) => [r.id, r.attributes || {}]));
-  const remote = {};
-  for (const s of sets.data || []) {
-    const m = new Map();
-    for (const ref of s.relationships?.appScreenshots?.data || []) {
-      const a = shotsById.get(ref.id);
-      if (a) m.set(a.fileName, a.sourceFileChecksum ?? null);
-      else m.set(ref.id, null); // not included — treat as present but unverifiable
-    }
-    remote[s.attributes.screenshotDisplayType] = m;
-  }
+  // Compared by CONTENT, not by count — the machinery lives in src/screenshots.mjs and is shared with
+  // `preflight`, so the two commands cannot drift apart in what "in sync" means. The history is there.
+  const local = localScreenshots(platform, config.primaryLocale);
+  const remote = await remoteScreenshots(client, primary.id);
   for (const dt of new Set([...Object.keys(local), ...Object.keys(remote)])) {
-    const L = local[dt] || new Map();
-    const R = remote[dt] || new Map();
+    const c = compareShots(local[dt] || new Map(), remote[dt] || new Map());
+    if (!c) continue;
     const label = `  ${yellow("screenshots")} ${dt.replace("APP_", "")}`;
-    if (L.size !== R.size) {
+    if (c.kind === "count") {
       diffs++;
-      console.log(`${label}: local ${L.size} / remote ${R.size}  (@${config.primaryLocale})`);
-      continue;
-    }
-    // Same count — so the only thing that can distinguish them is what the bytes are.
-    const changed = [...L].filter(([name, sum]) => R.has(name) && R.get(name) !== null && R.get(name) !== sum).map(([name]) => name);
-    const renamed = [...L.keys()].filter((name) => !R.has(name));
-    const unverifiable = [...L].filter(([name]) => R.has(name) && R.get(name) === null).map(([name]) => name);
-    if (renamed.length) {
+      console.log(`${label}: local ${c.local} / remote ${c.remote}  (@${config.primaryLocale})`);
+    } else if (c.kind === "renamed") {
       diffs++;
-      console.log(`${label}: ${renamed.length} not on the store by name (${renamed.slice(0, 3).join(", ")})  (@${config.primaryLocale})`);
-    } else if (changed.length) {
+      console.log(`${label}: ${c.names.length} not on the store by name (${c.names.slice(0, 3).join(", ")})  (@${config.primaryLocale})`);
+    } else if (c.kind === "stale") {
       diffs++;
-      console.log(`${label}: ${changed.length} of ${L.size} differ in content (${changed.slice(0, 3).join(", ")})  (@${config.primaryLocale})`);
-    } else if (unverifiable.length) {
+      console.log(`${label}: ${c.names.length} of ${c.of} differ in content (${c.names.slice(0, 3).join(", ")})  (@${config.primaryLocale})`);
+    } else {
       // Apple did not give a checksum back. Say so rather than reporting a match we did not establish.
-      console.log(`${label}: ${unverifiable.length} present, checksum not reported by Apple — content unverified`);
+      console.log(`${label}: ${c.names.length} present, checksum not reported by Apple — content unverified`);
     }
   }
   const { json: psets } = await client.get(`/v1/appStoreVersionLocalizations/${primary.id}/appPreviewSets?include=appPreviews&limit=50`);

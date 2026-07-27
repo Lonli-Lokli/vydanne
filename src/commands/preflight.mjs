@@ -1,5 +1,6 @@
 import { green, red, yellow, LIMITS, VERSION_FIELDS } from "../util.mjs";
 import { reportCrossStore } from "../crossStore.mjs";
+import { localScreenshots, remoteScreenshots, compareShots } from "../screenshots.mjs";
 
 // Verify a listing is submission-complete the CORRECT way — each localization read by id (not the sparse
 // list), char limits, primary-locale coverage, per-platform — and warn on the gotchas before ASC does.
@@ -34,9 +35,26 @@ export async function run(config, client) {
 
     const primary = locs.find((l) => l.attributes.locale === config.primaryLocale);
     if (primary) {
-      const { json } = await client.get(`/v1/appStoreVersionLocalizations/${primary.id}/appScreenshotSets?include=appScreenshots&limit=50`);
-      const count = (json.data || []).reduce((n, s) => n + (s.relationships?.appScreenshots?.data || []).length, 0);
+      // By CONTENT, not by count — the same comparison `diff` runs (src/screenshots.mjs), so the two
+      // cannot disagree about what "in sync" means. The count-only check this replaces called a STALE
+      // set green: a full local recapture left three-local-vs-three-remote, preflight said "no
+      // blockers", and the submission would have shipped the old art — which is precisely the state
+      // Niva sat in with store screenshots still showing a three-tier selector the app no longer had.
+      const remote = await remoteScreenshots(client, primary.id);
+      const count = Object.values(remote).reduce((n, m) => n + m.size, 0);
       if (!count) problems.push(`${platform}/${config.primaryLocale}: no screenshots`);
+      // Freshness is judged only where a local set exists: no local screenshots means there is nothing
+      // to compare against, not that the store's are wrong. A display type the store has and local
+      // lacks is likewise left alone — `fill` never deletes by omission, so this does not flag it.
+      for (const [dt, L] of Object.entries(localScreenshots(platform, config.primaryLocale))) {
+        const c = compareShots(L, remote[dt] || new Map());
+        if (!c) continue;
+        const slot = dt.replace("APP_", "");
+        if (c.kind === "count") problems.push(`${platform}/${config.primaryLocale}: screenshots ${slot} local ${c.local} / remote ${c.remote} — the store set is not the local one (\`fill\`, VYDANNE_REPLACE=1 to replace)`);
+        else if (c.kind === "renamed") problems.push(`${platform}/${config.primaryLocale}: screenshots ${slot} ${c.names.length} local file(s) not on the store by name (\`fill\`, VYDANNE_REPLACE=1 to replace)`);
+        else if (c.kind === "stale") problems.push(`${platform}/${config.primaryLocale}: screenshots ${slot} STALE — ${c.names.length} of ${c.of} differ in content; green would ship the old art (\`fill\`, VYDANNE_REPLACE=1 to replace)`);
+        else notes.push(`${platform}/${config.primaryLocale}: screenshots ${slot} present, checksum not reported by Apple — content unverified`);
+      }
     }
   }
 

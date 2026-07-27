@@ -4,12 +4,11 @@ import { green, yellow, red } from "../util.mjs";
 import { VALID } from "../locales.mjs";
 import { uploadAsset } from "../upload.mjs";
 import { reportCrossStore } from "../crossStore.mjs";
+import { deviceMap, screenshotBase } from "../screenshots.mjs";
 
 // Version-localization fields (attr -> metadata filename) and AppInfo fields (name/subtitle, shared).
 const VERSION_TXT = { description: "description", keywords: "keywords", promotionalText: "promotional_text", whatsNew: "release_notes", marketingUrl: "marketing_url", supportUrl: "support_url" };
 const INFO_TXT = { name: "name", subtitle: "subtitle" };
-const IOS_DEVICE = { iphone69: "APP_IPHONE_67", iphone65: "APP_IPHONE_65", ipad13: "APP_IPAD_PRO_3GEN_129", watch: "APP_WATCH_ULTRA" };
-const MAC_DEVICE = { macos: "APP_DESKTOP" };
 
 /**
  * PATCH a localization, surviving attributes Apple refuses to edit RIGHT NOW.
@@ -125,8 +124,8 @@ export async function run(config, client) {
 }
 
 async function uploadScreenshots(config, client, platform, verLocs) {
-  const base = platform === "MAC_OS" ? "fastlane/screenshots-macos" : "fastlane/screenshots";
-  const DEV = platform === "MAC_OS" ? MAC_DEVICE : IOS_DEVICE;
+  const base = screenshotBase(platform);
+  const DEV = deviceMap(platform);
   if (!fs.existsSync(base)) return;
   for (const code of fs.readdirSync(base).filter((d) => VALID.has(d))) {
     const loc = verLocs.find((l) => l.attributes.locale === code);

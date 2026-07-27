@@ -153,6 +153,19 @@ export default {
 };
 ```
 
+Every field is optional except `bundleId` and `primaryLocale`. The ones you reach for next:
+
+| Field | What it's for |
+|---|---|
+| `screenshots` | Where your screenshots live, per platform. Defaults to `fastlane/screenshots` + `fastlane/screenshots-macos`. |
+| `localeMap` | Your language codes → Apple's, for anything the built-in table misses (`{ nb: "no" }`). |
+| `ageRating` | The content descriptors behind any rating above `4+`. Apple computes the band from them. |
+| `reviewContact` | `{ demoAccountRequired }` — otherwise inferred from whether `review_information/demo_user.txt` exists. |
+| `export` | Export-compliance details. `algorithms` + `statement` are required for `encryption: "standard"`. |
+| `bridge` | `{ out, apple, play }` — which zdymak output folder feeds which store slot, when `dir:` overrides make them differ. |
+| `push` | `{ skip: [...] }` — pipeline steps this app never runs. |
+| `google` | The Play block, including `track`, `images` and `imageLocales`. |
+
 **3. Write your listing** as plain text files, one folder per language:
 
 ```
@@ -187,7 +200,7 @@ DRY RUN — 'fill' will not change App Store Connect. Add --apply to write.
 DRY RUN — 40 store write(s) withheld. Re-run with --apply to perform them.
 ```
 
-The commands this applies to are marked `✎` in `vydanne help`: `prepare`, `push`, `fill`, `previews`,
+The commands this applies to are marked `✎` in the usage text (`vydanne` with no arguments): `prepare`, `push`, `fill`, `previews`,
 `age-rating`, `review-contact`, `accessibility`, `prerelease`. Everything else only reads, and ignores
 the flag.
 
@@ -219,7 +232,7 @@ Two details worth knowing:
 | `previews` | Uploads App Preview videos. |
 | `inspect` | Shows the app's current state in the store. Read-only. |
 | `locales` | Lists your languages and Apple's code for each — and warns about any language the App Store doesn't offer. |
-| `age-rating` | Sets the age rating. |
+| `age-rating` | Sets the age rating. `rating: "4+"` needs nothing else; any higher rating is described feature-by-feature in `ageRating` and Apple computes the band from it. |
 | `review-contact` | Fills in the App Review contact details (who Apple calls if there's a problem). |
 | `accessibility` | Saves Accessibility Nutrition Labels from the `accessibility` block in your config. Stays a draft until your app is live. Refuses to run if you have not declared one — see below. |
 | `privacy` | Prints the privacy answers to paste into Apple's website (Apple's privacy section has no API). |
@@ -398,9 +411,9 @@ don't have to learn them the hard way.
 | Your main language is left empty → most of the world sees a blank page | `preflight` refuses to pass |
 | macOS is a **separate** listing; its text is not shared with iOS | Fills each platform independently |
 | Apple's list endpoints return blank text, so tools "see" an empty listing | Reads each language individually |
-| Screenshots with transparency get rejected | Converts them to RGB |
+| Screenshots with transparency get rejected | `bridge` refuses before copying and names the files; `VYDANNE_FLATTEN` converts one |
 | Once a version is *Ready for Review*, most tools can no longer edit it | Uses a method that still works |
-| Character limits (30 / 30 / 100 / 170; purchases 30 / 45) | Checked before upload, not after rejection |
+| Character limits (name/subtitle 30, keywords 100, promo 170; purchases 30 / 45) | All checked by `preflight` before upload, not after rejection |
 | One translation says "also on Google Play" → rejected under guideline 2.3.10 | Every locale is scanned before upload; `preflight` and `fill` both refuse |
 | Apple's privacy section can't be reached by any API key | Prints the exact answers to paste in |
 | Accessibility labels can't publish before launch | Saved as a draft automatically |

@@ -55,8 +55,30 @@ which user file was used, and whether the `.p8` is on disk.
 
 **Config fields:** `bundleId` · `primaryLocale` (the fallback — must be populated) · `asc` (optional
 `{profile}` — selection only, never secrets) · `platforms` (iOS and macOS are SEPARATE) · `uiLocales`
-(auto-mapped to ASC codes) · `metadataDir` · `rating` · `privacy` · `iaps` · `previews` · `export` ·
-`google` (Google Play).
+(auto-mapped to ASC codes) · `localeMap` · `metadataDir` · `screenshots` · `rating` · `ageRating` ·
+`privacy` · `iaps` · `previews` · `export` · `accessibility` · `ios` · `google` (Google Play) ·
+`bridge` · `push` · `reviewContact` · `allowCrossStoreTerms`.
+
+**Paths are defaults, not laws.** `metadataDir` (default `fastlane/metadata`), `screenshots`
+(`{IOS, MAC_OS}`, default `fastlane/screenshots` + `-macos`) and `google.images` (Play image type →
+local path) all follow fastlane's supply convention out of the box and are all overridable. Point them
+at the repo you have rather than reshaping the repo around the tool.
+
+**Four blocks the tool will NOT fill in for you.** Each publishes a CLAIM rather than a fact, so silence
+is refused instead of defaulted — that is deliberate, and re-adding a default is the bug, not the fix:
+
+- **`accessibility`** — Accessibility Nutrition Labels. Declare every feature true/false from what was
+  actually verified. No block → the command errors.
+- **`export.algorithms` + `export.statement`** — the cryptography inventory and statement in the US
+  export-compliance PDF (`compliance`). Required when `export.encryption` is `"standard"`. Never invent
+  these; ask what the app actually ships. `export.filed` stays **false** until the report has really
+  been emailed to BIS and the NSA, and while it is false the PDF does not claim it was submitted.
+- **`ageRating`** — needed for any `rating` above `"4+"`. Describe the CONTENT
+  (`{ violenceCartoonOrFantasy: "INFREQUENT_OR_MILD" }`, merged over an all-NONE base); Apple computes
+  the band. `"4+"` alone needs nothing else.
+- **`reviewContact` / demo account** — whether App Review needs a login is inferred from
+  `<metadataDir>/review_information/demo_user.txt` + `demo_password.txt` (both gitignored). An app with
+  a sign-in wall and no demo account is a guaranteed rejection.
 
 For a non-technical user asking how to set this up from scratch, walk them through
 **`GETTING_STARTED.md`** (accounts → API key → config → folders → push) rather than improvising.
@@ -106,20 +128,30 @@ and uploads yours, the same flag `previews` uses. PNGs must be **RGB with no alp
 (30 / 80 / 4000). Play uses its **own** codes (`de-DE`, `zh-CN`, `iw-IL`, `ar`, `be`) — *not* Apple's
 `zh-Hans`/`he`/`ar-SA`.
 
-**Play images** — hardcoded source paths, each pushed only when the file exists, so a missing local set
-never deletes the live one: `brand/icons/play/icon-512.png` (512², from znachok) ·
-`marketing/out/play-feature-graphic.png` (1024×500) · `marketing/out/play-phone-plain/` ·
-`marketing/out/play-tablet7-plain/` (7″) · `marketing/out/play-tablet-plain/` (10″). An image dir that
-exists but is EMPTY is reported (by `fill` and `diff`) as a live set only Play Console can remove.
+**Play images** — DEFAULT source paths (override any of them with `google.images`), each pushed only
+when the file exists, so a missing local set never deletes the live one:
+`brand/icons/play/icon-512.png` (512², from znachok) · `marketing/out/play-feature-graphic.png`
+(1024×500) · `marketing/out/play-phone-plain/` · `marketing/out/play-tablet7-plain/` (7″) ·
+`marketing/out/play-tablet-plain/` (10″) · `marketing/out/play-wear/`. `wearScreenshots`, `tvScreenshots`
+and `tvBanner` are also understood, so a Wear OS or Android TV release is a config line, not a code
+change. An image dir that exists but is EMPTY is reported (by `fill` and `diff`) as a live set only
+Play Console can remove.
+
+Play holds graphics **per language**. The default uploads one untranslated set at
+`google.defaultLocale`; `google.imageLocales` (a list, or `"*"` for every local listing folder) opts
+into localized art, and a `<source>/<lang>/` subdirectory overrides the shared source for that language.
+`diff --store google` compares exactly the locales `fill` would write, so the two never disagree.
 
 **`bridge` populates both screenshot layouts from zdymak's output.** It maps
-`store-assets/<locale>/<target>/NN-name.png` onto the Apple and Play paths above: locale codes via the
+`store-assets/<locale>/<dir>/NN-name.png` onto the Apple and Play paths above: locale codes via the
 same `toAsc` table `fill` uses (`de` → `de-DE`; a code with no App Store language is skipped and falls
 back to the primary listing), the device-slot prefix prepended (`iphone69_01-fresh.png`), and the Play
-targets into `marketing/out/…`. Each destination is rebuilt from empty (idempotent — removed upstream
-means removed here), a locale with screenshots but NO listing text is held back (uploading pictures
-alone would create the localization and break its fallback to the primary language), and every bridged
-PNG is checked for an alpha channel, which Apple rejects. Local files only; `--dry-run` previews.
+sets into their configured destinations. A locale with screenshots but NO listing text is held back
+(uploading pictures alone would create the localization and break its fallback to the primary
+language), and every bridged image is checked for an alpha channel — which Apple rejects — on the
+SOURCE, before anything is copied, so a refusal leaves the destinations untouched and `--dry-run`
+catches it too. Local files only; `--dry-run` previews what would be written *and removed*. See the
+directory-vs-target note under Commands for why the source folder name is the thing that matters.
 
 ## A. Writing the listing (the ASO craft — the durable value)
 
@@ -185,6 +217,16 @@ RGB flatten) · `compliance` (US self-classification PDF) · `bridge` (zdymak's 
 (completeness gate + cross-store lint + stale-screenshot check) · `inspect` · `auth` (what credentials
 resolved, and from where) · `locales` · `version`.
 
+**`bridge` maps by DIRECTORY, not by target.** zdymak writes each shot to `<dir || target>`, so a
+`dir:` override makes the folder name differ from the target name — and Play's 7" slot can *only* exist
+that way (`{ target: 'play-tablet', dir: 'play-tablet7-plain' }`; there is no `play-tablet7` target).
+Defaults prefer the `-plain` convention Google asks for on listings and fall back to the bare target
+name; `bridge.apple` / `bridge.play` override per slot. It **owns its destinations per store**: any
+Apple output means both Apple roots are rebuilt (so art dropped upstream stops being uploaded), while
+an app that bridges only Play never has its hand-managed Apple screenshots touched. It plans before it
+writes — a failure (alpha channel, empty source) leaves every destination untouched, and `--dry-run`
+reports exactly what a real run would write *and remove*.
+
 **Cross-store lint.** `preflight` and `fill` refuse listing text that names the other mobile platform
 — App Review 2.3.10 for Apple, the Store Listing and Promotion policy for Google — scanning every
 locale and field of the LOCAL metadata before upload, including localized spellings of Android/Apple.
@@ -204,8 +246,15 @@ PREPARE_FOR_SUBMISSION version (creating the app record made it), so `prepare` i
 no-op; an UPDATE has only the read-only live version until `prepare` creates the next one. On a live
 app a DRY `push` stops at `fill` — the draft the later steps target doesn't exist until `prepare` is
 applied — and says so up front; `prepare --apply` (a draft, not a submission) then a dry `push`
-previews the whole plan. `prerelease` is deliberately not a step (macOS-only, shells out to altool);
-run it whenever the build is ready — `prepare` attaches the newest build either way.
+previews the whole plan. `prepare` creates a version for EVERY declared platform, so an iOS+macOS app
+gets both drafts. `prerelease` is deliberately not a step (macOS-only, shells out to altool); run it
+whenever the build is ready — `prepare` attaches the newest build either way.
+
+**`push --skip <step>[,<step>]`** (or `push: { skip: [...] }`) drops a step that doesn't apply — the
+usual case being an app with no audited `accessibility` block, which the command correctly refuses to
+guess. `prepare` and `preflight` cannot be skipped. Every skip is reported on its own line AND again
+after the final green, because the whole value of that last line is that green means green: never let
+a skipped run read like a complete one.
 
 `prepare` creates the version to write INTO, and is REQUIRED as the first push step on any app that
 already has a version on sale. Every other Apple command finds its target through
@@ -255,7 +304,7 @@ The AAB binary and the (YouTube-URL) promo video stay outside vydanne.
 
 **Every store-mutating command is a DRY RUN without `--apply`**: `prepare` · `push` · `fill` ·
 `previews` · `age-rating` · `review-contact` · `accessibility` · `prerelease` (marked `✎` in
-`vydanne help`). They read the store, print each write they would make, and send nothing. Read-only
+the usage text, printed by `vydanne` with no arguments). They read the store, print each write they would make, and send nothing. Read-only
 commands ignore the flag.
 
 Never reach for `--apply` to "check whether it works" — the dry run IS the check, and it walks the whole

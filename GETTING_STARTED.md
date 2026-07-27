@@ -220,14 +220,20 @@ export default {
 | `primaryLocale` | Your main App Store language. Any language you *don't* translate falls back to this, so it must be complete. |
 | `platforms` | `["IOS"]`, or `["IOS", "MAC_OS"]` if you ship a Mac app too. **Mac is a separate listing** — its text is not shared with iOS. |
 | `uiLocales` | Short language codes you publish in. vydanne converts them to Apple's codes (`de` → `de-DE`) and warns about any language the App Store doesn't offer. |
+| `localeMap` | Optional. Your code → Apple's code, for anything the built-in table doesn't cover (`{ "nb": "no" }`). Merged over the defaults, so list only your exceptions. |
 | `metadataDir` | Where your listing text lives. `fastlane/metadata` is the default. |
-| `rating` | Age rating, e.g. `"4+"`. |
+| `screenshots` | Optional. Where your screenshots live, per platform: `{ IOS: "…", MAC_OS: "…" }`. Defaults to `fastlane/screenshots` and `fastlane/screenshots-macos`. |
+| `rating` | Age rating, e.g. `"4+"`. Anything other than `"4+"` also needs `ageRating` below. |
+| `ageRating` | The content descriptors behind a rating above 4+, e.g. `{ violenceCartoonOrFantasy: "INFREQUENT_OR_MILD" }`. Merged over an all-NONE base — Apple computes the band from what you declare. |
+| `reviewContact` | Optional `{ demoAccountRequired }`. By default this is inferred from whether `review_information/demo_user.txt` exists. |
 | `asc` | Optional `{ keyId, issuerId }` — only if you'd rather not use environment variables. |
 | `privacy` | What data actually leaves the device, e.g. `{ collected: ["CRASH_DATA"], tracking: false }`. |
 | `iaps` | Your in-app purchases (name ≤30 chars, description ≤45). |
 | `previews` | App Preview videos — see step 7. |
-| `export` | Export-compliance details for the PDF: `{ encryption: "standard", appName, version, teamId }`. |
-| `google` | The Play block — `{ packageName, metadataDir, defaultLocale }`. Omit it if you're iOS-only. |
+| `export` | Export-compliance details for the PDF: `{ encryption, appName, version, teamId, algorithms, statement, filed }`. `algorithms` and `statement` are **required** when `encryption` is `"standard"` — the command will not invent your cryptography. |
+| `google` | The Play block — `{ packageName, metadataDir, defaultLocale, track, images, imageLocales }`. Omit it if you're iOS-only. |
+| `bridge` | Optional `{ out, apple, play }` — where zdymak wrote, and which of its output folders feed which store slot. Only needed when `dir:` in `zdymak.config.mjs` makes a folder name differ from its target name. |
+| `push` | Optional `{ skip: [...] }` — pipeline steps this app never runs. |
 
 Check your languages resolved correctly:
 
@@ -288,11 +294,16 @@ image is for. Anything after it is yours — but files upload in alphabetical or
 | `watch_` | Apple Watch Ultra |
 | `macos_` | Mac (in `screenshots-macos/`) |
 
-A file whose prefix isn't in that table is **silently skipped** — if a screenshot doesn't appear, check
-the name first.
+A file whose prefix isn't in that table is **not uploaded**, and `fill` says so by name — it lists every
+file it skipped and the prefixes it knows. Same for a folder that isn't an App Store locale code (`de`
+instead of `de-DE`, the classic one): named, not dropped in silence.
 
-> **Screenshots must be RGB PNGs with no transparency.** Simulator captures often have an alpha channel
-> and Apple rejects those. `npx vydanne iap` with `VYDANNE_FLATTEN=path/to.png` converts one for you.
+PNG and JPEG are both accepted.
+
+> **Screenshots must have no transparency.** Simulator captures often carry an alpha channel and Apple
+> rejects those. `npx vydanne bridge` refuses before copying anything if it finds one, and tells you
+> which file; to fix a single image in place, `VYDANNE_FLATTEN=path/to.png npx vydanne iap` converts it
+> to RGB. Note that `fill` itself does **not** convert — flatten at the source.
 
 **Google Play** uses its **own** language codes (`de-DE`, `zh-CN`, `iw-IL`, `ar` — *not* Apple's
 `zh-Hans`/`he`), and only three text files:

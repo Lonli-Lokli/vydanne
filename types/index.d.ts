@@ -116,9 +116,102 @@ export interface GoogleConfig {
   defaultLocale?: string;
   /** `.aab` for `prerelease` — a file, or a directory whose NEWEST .aab is taken. Override: VYDANNE_AAB. */
   aab?: string;
-  /** Testing track for `prerelease`: 'internal' (default) | 'alpha' | 'beta'. 'production' is refused. */
-  track?: "internal" | "alpha" | "beta";
+  /**
+   * Testing track for `prerelease`. 'internal' (default), 'alpha', 'beta', or the name of any closed
+   * track you created in Play Console. Only 'production' is refused — that release is a human's.
+   */
+  track?: string;
+  /**
+   * Play image type -> local source path. Merged over the defaults, so declare only what differs.
+   * A type whose source does not exist is skipped; a missing local set never deletes the live one.
+   */
+  images?: Partial<Record<PlayImageType, string>>;
+  /**
+   * Locales to upload graphics to. Play holds images per language; the default is one set at
+   * `defaultLocale`. Pass a list, or '*' for every local listing folder. A `<source>/<lang>`
+   * subdirectory, when present, overrides the shared source for that language.
+   */
+  imageLocales?: string[] | "*";
 }
+
+/** Play listing image slots. */
+export type PlayImageType =
+  | "icon"
+  | "featureGraphic"
+  | "tvBanner"
+  | "phoneScreenshots"
+  | "sevenInchScreenshots"
+  | "tenInchScreenshots"
+  | "wearScreenshots"
+  | "tvScreenshots";
+
+/** Where `bridge` reads zdymak's output from, and which directory feeds which store slot. */
+export interface BridgeConfig {
+  /** zdymak's output root. Read from zdymak.config.mjs when absent; './store-assets' otherwise. */
+  out?: string;
+  /**
+   * Screenshot slot token -> the zdymak output directory it comes from (a name, or names in
+   * preference order). Defaults cover zdymak's own target names; override when `dir:` in
+   * zdymak.config.mjs makes the directory name differ from the target name.
+   */
+  apple?: Record<string, string | string[]>;
+  /** Play image type -> the zdymak output directory it comes from. Same shape and reason. */
+  play?: Partial<Record<PlayImageType, string | string[]>>;
+}
+
+/** Overrides for the App Review contact. The PII itself stays in gitignored .txt files. */
+export interface ReviewContactConfig {
+  /**
+   * Whether App Review needs a demo account. Inferred from the presence of
+   * `<metadataDir>/review_information/demo_user.txt` when omitted — set it only to disagree.
+   */
+  demoAccountRequired?: boolean;
+}
+
+/** `push` defaults. `--skip` adds to this per invocation. */
+export interface PushConfig {
+  /** Steps this app never runs. 'prepare' and 'preflight' cannot be skipped. */
+  skip?: CommandName[];
+}
+
+/**
+ * Age-rating content descriptors, for any rating other than '4+'.
+ *
+ * Merged over an all-NONE base, so declare only what applies. Apple computes the rating band from
+ * these — you describe the content, it decides the number. Enum keys take
+ * 'NONE' | 'INFREQUENT_OR_MILD' | 'FREQUENT_OR_INTENSE'; the rest are booleans.
+ */
+export interface AgeRatingConfig {
+  advertising?: boolean;
+  alcoholTobaccoOrDrugUseOrReferences?: AgeRatingLevel;
+  contests?: AgeRatingLevel;
+  gambling?: boolean;
+  gamblingSimulated?: AgeRatingLevel;
+  gunsOrOtherWeapons?: AgeRatingLevel;
+  healthOrWellnessTopics?: boolean;
+  kidsAgeBand?: "FIVE_AND_UNDER" | "SIX_TO_EIGHT" | "NINE_TO_ELEVEN" | null;
+  lootBox?: boolean;
+  medicalOrTreatmentInformation?: AgeRatingLevel;
+  messagingAndChat?: boolean;
+  parentalControls?: boolean;
+  profanityOrCrudeHumor?: AgeRatingLevel;
+  ageAssurance?: boolean;
+  sexualContentGraphicAndNudity?: AgeRatingLevel;
+  sexualContentOrNudity?: AgeRatingLevel;
+  socialMedia?: boolean;
+  socialMediaAgeRestricted?: boolean;
+  horrorOrFearThemes?: AgeRatingLevel;
+  matureOrSuggestiveThemes?: AgeRatingLevel;
+  unrestrictedWebAccess?: boolean;
+  userGeneratedContent?: boolean;
+  violenceCartoonOrFantasy?: AgeRatingLevel;
+  violenceRealisticProlongedGraphicOrSadistic?: AgeRatingLevel;
+  violenceRealistic?: AgeRatingLevel;
+  ageRatingOverrideV2?: AgeRatingLevel;
+  koreaAgeRatingOverride?: AgeRatingLevel;
+}
+
+export type AgeRatingLevel = "NONE" | "INFREQUENT_OR_MILD" | "FREQUENT_OR_INTENSE";
 
 export interface ExportConfig {
   /** 'standard' → self-classify (ECCN 5D002, ENC 740.17(b)(1)); else no compliance doc is generated. */
@@ -128,6 +221,19 @@ export interface ExportConfig {
   appName?: string;
   version?: string;
   teamId?: string;
+  /**
+   * The app's cryptography inventory: [purpose, algorithm, keySize] per row. REQUIRED when
+   * `encryption` is 'standard' — `compliance` will not invent one, because the PDF it generates makes
+   * factual claims to a US export authority.
+   */
+  algorithms?: Array<[string, string, string?]>;
+  /** The statement paragraph, in your own words. REQUIRED when `encryption` is 'standard'. */
+  statement?: string;
+  /**
+   * Set true only once the report has ACTUALLY been emailed to BIS and the NSA. When false (default)
+   * the generated PDF does not claim it was submitted.
+   */
+  filed?: boolean;
 }
 
 /** The `vydanne.config.mjs` default export. */
@@ -145,9 +251,23 @@ export interface VydanneConfig {
   platforms?: Platform[];
   /** App UI locales; mapped to ASC codes (unsupported ones fall back to primary). */
   uiLocales?: string[];
+  /**
+   * App locale code -> App Store locale code, for codes Apple spells differently or does not know.
+   * Merged over the built-in table, so declare only your exceptions. An override naming a code Apple
+   * does not have is reported by `locales` and `preflight` rather than silently ignored.
+   */
+  localeMap?: Record<string, string>;
   metadataDir?: string;
-  /** e.g. '4+'. */
+  /**
+   * Where each platform's screenshots live. Defaults to fastlane's supply convention
+   * ('fastlane/screenshots' and 'fastlane/screenshots-macos'). Read by `fill`, `diff`, `preflight`
+   * and written by `bridge`.
+   */
+  screenshots?: { IOS?: string; MAC_OS?: string };
+  /** e.g. '4+'. Anything else needs `ageRating` to say what makes it that. */
   rating?: string;
+  /** Content descriptors for a rating above '4+'. Merged over an all-NONE base. */
+  ageRating?: AgeRatingConfig;
   privacy?: PrivacyConfig;
   iaps?: IapConfig[];
   previews?: PreviewSpec[];
@@ -158,6 +278,12 @@ export interface VydanneConfig {
   ios?: IosConfig;
   /** Google Play (`--store google`): listings, screenshots, feature graphic via the Edits API. */
   google?: GoogleConfig;
+  /** Where `bridge` reads zdymak's output from, and which directory feeds which store slot. */
+  bridge?: BridgeConfig;
+  /** `push` defaults — steps this app never runs. */
+  push?: PushConfig;
+  /** App Review contact overrides (the PII itself stays in gitignored .txt files). */
+  reviewContact?: ReviewContactConfig;
   /**
    * Terms the cross-store check must not flag for this app.
    *
@@ -198,15 +324,76 @@ export declare class Client {
   localization(id: string, kind?: string): Promise<Record<string, unknown>>;
 }
 
-export declare function loadConfig(path?: string): Promise<VydanneConfig & { resolvedLocales: { supported: Record<string, string>; unsupported: string[] } }>;
+/** Play Developer Edits API client. Every mutation happens inside an Edit; an uncommitted Edit is a no-op. */
+export declare class PlayClient {
+  static create(opts: { keyPath: string; packageName: string; dryRun?: boolean }): Promise<PlayClient>;
+  dryRun: boolean;
+  newEdit(): Promise<string>;
+  validate(editId: string): Promise<{ status: number; json: any }>;
+  commit(editId: string): Promise<{ status: number; json: any }>;
+  deleteEdit(editId: string): Promise<unknown>;
+  getListings(editId: string): Promise<{ status: number; json: any }>;
+  putListing(editId: string, lang: string, body: Record<string, unknown>): Promise<{ status: number; json: any }>;
+  listImages(editId: string, lang: string, type: string): Promise<{ status: number; json: any }>;
+  deleteAllImages(editId: string, lang: string, type: string): Promise<unknown>;
+  uploadImage(editId: string, lang: string, type: string, file: string): Promise<unknown>;
+}
+
+export type Store = "apple" | "google";
+
+/**
+ * Run one command, the way the CLI runs it — minus argv parsing and process.exit.
+ *
+ * `apply` defaults to FALSE, the same safety gate `--apply` drives: a caller that forgets it gets a
+ * dry run, never a write. `planned` is the machine-readable form of the writes a dry run withheld.
+ */
+export declare function runCommand(
+  name: string,
+  opts?: {
+    config?: VydanneConfig;
+    configPath?: string;
+    store?: Store;
+    apply?: boolean;
+  },
+): Promise<{ ok: boolean; planned: Array<{ method: string; path: string; attributes: Record<string, unknown> }> }>;
+
+export declare function loadConfig(path?: string): Promise<ResolvedConfig>;
 export declare function makeToken(opts: { keyId: string; issuerId: string; keyPath?: string }): string;
-export declare function resolveLocales(uiCodes: string[]): { supported: Record<string, string>; unsupported: string[] };
-export declare function toAsc(code: string): string | null;
+export declare function resolveLocales(uiCodes: string[], extra?: Record<string, string>): ResolvedLocales;
+export declare function toAsc(code: string, extra?: Record<string, string>): string | null;
 export declare const VALID: Set<string>;
+export declare const UI_TO_ASC: Record<string, string>;
 export declare const CONFIG_KEYS: readonly string[];
 export declare const COMMAND_NAMES: readonly CommandName[];
+
+/** Screenshot filename prefix -> ASC display type, per platform. */
+export declare const IOS_DEVICE: Record<string, string>;
+export declare const MAC_DEVICE: Record<string, string>;
+export declare const DEFAULT_SCREENSHOT_BASE: { IOS: string; MAC_OS: string };
+/** Where this platform's screenshots live: `screenshots` in the config, else the supply convention. */
+export declare function screenshotBase(platform: Platform, config?: VydanneConfig): string;
+
+export declare const DEFAULT_PLAY_IMAGES: Partial<Record<PlayImageType, string>>;
+export declare const PLAY_IMAGE_KIND: Record<PlayImageType, "file" | "dir">;
+/** The resolved Play image table for one app: [type, localSource, kind][]. */
+export declare function playImages(config: VydanneConfig): Array<[string, string, "file" | "dir"]>;
+
 /** `writes` marks a command that mutates the STORE — those are dry-run unless the CLI gets `--apply`.
  *  `credentials` marks the one command (prerelease) whose altool child authenticates itself. */
 export declare const COMMANDS: Record<string, { mod: string; client?: boolean; credentials?: boolean; writes?: boolean }>;
+/** The same, for `--store google`. Same names, different backend. */
+export declare const PLAY_COMMANDS: Record<string, { mod: string; writes?: boolean }>;
 
+export interface ResolvedLocales {
+  supported: Record<string, string>;
+  /** Codes with no App Store language — they fall back to the primary listing. */
+  unsupported: string[];
+  /** `localeMap` entries pointing at a code Apple does not have. A config mistake, not a missing language. */
+  invalid: string[];
+}
+
+export type ResolvedConfig = VydanneConfig & { resolvedLocales: ResolvedLocales };
+
+// NOTE: this is a TYPE-only default export — `import type cfg from "vydanne"`. There is no runtime
+// default export, so `import cfg from "vydanne"` in JS gets undefined. Import the named values.
 export default VydanneConfig;

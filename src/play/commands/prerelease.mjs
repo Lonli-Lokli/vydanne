@@ -3,8 +3,15 @@ import path from "node:path";
 import { green, yellow, red } from "../../util.mjs";
 import { readAabVersionCode } from "../aab.mjs";
 
-/** Tracks this command will write. `production` is deliberately absent — see below. */
-const TESTING_TRACKS = new Set(["internal", "alpha", "beta"]);
+/**
+ * The one track this command refuses. Everything else is passed through.
+ *
+ * `internal`, `alpha` and `beta` are Play's BUILT-IN track names, not the whole vocabulary: Play
+ * Console encourages named closed tracks ("qa", "beta-partners"), and its API addresses them by that
+ * name. A closed list rejected every one of them with "unknown track" — refusing a release for a
+ * reason that was never true. The production refusal below is the one that matters, and it is exact.
+ */
+const PRODUCTION = "production";
 
 /**
  * Upload an .aab to a CLOSED TESTING track, with release notes.
@@ -27,13 +34,15 @@ export async function run(config, client) {
   const g = config.google;
   const track = process.env.VYDANNE_TRACK || g.track || "internal";
 
-  if (track === "production") {
+  if (track === PRODUCTION) {
     console.error(red("prerelease: refusing to write the production track — that release is a human's to make."));
     console.error("  Promote the tested build in Play Console when you're ready.");
     return false;
   }
-  if (!TESTING_TRACKS.has(track)) {
-    console.error(red(`prerelease: unknown track "${track}" (expected: ${[...TESTING_TRACKS].join(", ")})`));
+  // Any other name is handed to Play, which knows its own tracks: a typo comes back as a 404 naming
+  // the track, which is a better error than a list that was never authoritative.
+  if (!track) {
+    console.error(red("prerelease: no track — set `google.track` or VYDANNE_TRACK."));
     return false;
   }
 

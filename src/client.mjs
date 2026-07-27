@@ -3,13 +3,15 @@ import { yellow } from "./util.mjs";
 
 const API = "https://api.appstoreconnect.apple.com";
 const IRIS = "https://appstoreconnect.apple.com/iris";
-const DEAD_VERSION = ["READY_FOR_SALE", "REMOVED_FROM_SALE", "REPLACED_WITH_NEW_VERSION"];
+// DEVELOPER_REMOVED_FROM_SALE is the state a version reaches when the DEVELOPER pulls it, as opposed to
+// Apple; both are shipped versions that will never become editable again, so both are dead here.
+const DEAD_VERSION = ["READY_FOR_SALE", "REMOVED_FROM_SALE", "DEVELOPER_REMOVED_FROM_SALE", "REPLACED_WITH_NEW_VERSION"];
 // READY_FOR_DISTRIBUTION is Apple's newer name for the LIVE app-info (they're migrating the
 // state vocabulary; versions still report appStoreState=READY_FOR_SALE). Without it here,
 // appInfo() treats the live record as editable and every name/subtitle PATCH comes back
 // ENTITY_ERROR.ATTRIBUTE.INVALID.INVALID_STATE — which fails the whole locale in `fill`,
 // release notes included, on any app that already has a version on sale.
-const DEAD_INFO = ["READY_FOR_SALE", "READY_FOR_DISTRIBUTION", "REPLACED_WITH_NEW_VERSION", "REMOVED_FROM_SALE"];
+const DEAD_INFO = ["READY_FOR_SALE", "READY_FOR_DISTRIBUTION", "REPLACED_WITH_NEW_VERSION", "REMOVED_FROM_SALE", "DEVELOPER_REMOVED_FROM_SALE"];
 
 // Anything that is not a read. ASC has no transaction to roll back — unlike Play, where an edit can be
 // discarded — so for Apple the only safe place to stand between a command and a live listing is here.

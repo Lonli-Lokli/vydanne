@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { green, red, yellow } from "../../util.mjs";
-import { IMAGES } from "./fill.mjs";
+import { playImages, imageLocales } from "../images.mjs";
 
 // [Play listing attribute, local metadata filename] — supply's convention under fastlane/metadata/android.
 const FIELDS = [["title", "title"], ["shortDescription", "short_description"], ["fullDescription", "full_description"]];
@@ -48,29 +48,34 @@ export async function run(config, client) {
     // (the comparison supply itself uses to skip identical uploads), so local bytes can be checked
     // against the store without downloading anything. Only types with a LOCAL asset are judged, and a
     // remote-only type is left unflagged — mirroring fill, which never deletes by omission.
-    const lang = g.defaultLocale;
-    for (const [type, src, kind] of IMAGES) {
-      if (!fs.existsSync(src)) continue;
-      const files = kind === "dir" ? fs.readdirSync(src).filter((f) => /\.(png|jpe?g)$/i.test(f)).sort().map((f) => path.join(src, f)) : [src];
-      const label = `  ${yellow("images")} ${type}`;
-      // A dir that exists but is empty means the local set was deliberately cleared — `fill` will not
-      // touch the live one (never-delete-by-omission), so if the store still holds images they are
-      // stale and only Play Console can remove them. Reported, not counted as actionable, because no
-      // vydanne command would change it.
-      if (!files.length) {
-        const held = ((await client.listImages(editId, lang, type)).json.images || []).length;
-        if (held) console.log(`${label}: local dir empty, store holds ${held} — stale; only Play Console can remove them  (@${lang})`);
-        continue;
-      }
-      const local = files.map((f) => sha1(fs.readFileSync(f)));
-      const remote = ((await client.listImages(editId, lang, type)).json.images || []).map((i) => i.sha1);
-      if (local.length !== remote.length) {
-        actionable++;
-        console.log(`${label}: local ${local.length} / remote ${remote.length}  (@${lang})`);
-      } else if (JSON.stringify([...local].sort()) !== JSON.stringify([...remote].sort())) {
-        const changed = local.filter((s) => !remote.includes(s)).length;
-        actionable++;
-        console.log(`${label}: ${changed} of ${local.length} differ in content  (@${lang})`);
+    // Every locale `fill` would upload to, so the two commands agree on what "in sync" covers. With the
+    // default (no `google.imageLocales`) that is the one `defaultLocale` this always compared.
+    for (const lang of imageLocales(g, localLangs)) {
+      for (const [type, src, kind] of playImages(config)) {
+        const localized = path.join(src, lang);
+        const from = kind === "dir" && fs.existsSync(localized) ? localized : src;
+        if (!fs.existsSync(from)) continue;
+        const files = kind === "dir" ? fs.readdirSync(from).filter((f) => /\.(png|jpe?g)$/i.test(f)).sort().map((f) => path.join(from, f)) : [from];
+        const label = `  ${yellow("images")} ${type}`;
+        // A dir that exists but is empty means the local set was deliberately cleared — `fill` will not
+        // touch the live one (never-delete-by-omission), so if the store still holds images they are
+        // stale and only Play Console can remove them. Reported, not counted as actionable, because no
+        // vydanne command would change it.
+        if (!files.length) {
+          const held = ((await client.listImages(editId, lang, type)).json.images || []).length;
+          if (held) console.log(`${label}: local dir empty, store holds ${held} — stale; only Play Console can remove them  (@${lang})`);
+          continue;
+        }
+        const local = files.map((f) => sha1(fs.readFileSync(f)));
+        const remote = ((await client.listImages(editId, lang, type)).json.images || []).map((i) => i.sha1);
+        if (local.length !== remote.length) {
+          actionable++;
+          console.log(`${label}: local ${local.length} / remote ${remote.length}  (@${lang})`);
+        } else if (JSON.stringify([...local].sort()) !== JSON.stringify([...remote].sort())) {
+          const changed = local.filter((s) => !remote.includes(s)).length;
+          actionable++;
+          console.log(`${label}: ${changed} of ${local.length} differ in content  (@${lang})`);
+        }
       }
     }
   } finally {

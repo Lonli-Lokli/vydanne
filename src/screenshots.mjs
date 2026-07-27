@@ -1,23 +1,63 @@
 import fs from "node:fs";
 import path from "node:path";
 import { md5 } from "./upload.mjs";
+import { VALID } from "./locales.mjs";
 
-// Screenshot filename prefix -> ASC display type, plus the two hardcoded base paths. ONE copy, used by
-// three commands: `fill` uploads by these, `diff` and `preflight` judge freshness by them. They used to
-// be pasted into fill.mjs and diff.mjs separately, which is one edit away from `fill` uploading a set
-// that `diff` then can't see — the same drift this module's callers exist to catch in other people.
+// Screenshot filename prefix -> ASC display type, plus the base paths. ONE copy, used by three commands:
+// `fill` uploads by these, `diff` and `preflight` judge freshness by them. They used to be pasted into
+// fill.mjs and diff.mjs separately, which is one edit away from `fill` uploading a set that `diff` then
+// can't see — the same drift this module's callers exist to catch in other people.
+// Apple accepts JPEG as well as PNG for screenshots. The `.png`-only filter this replaces made a `.jpg`
+// set invisible to fill, diff AND preflight at once: nothing uploaded, nothing compared, preflight green.
+export const IMAGE_FILE = /\.(png|jpe?g)$/i;
+
 export const IOS_DEVICE = { iphone69: "APP_IPHONE_67", iphone65: "APP_IPHONE_65", ipad13: "APP_IPAD_PRO_3GEN_129", watch: "APP_WATCH_ULTRA" };
 export const MAC_DEVICE = { macos: "APP_DESKTOP" };
 export const deviceMap = (platform) => (platform === "MAC_OS" ? MAC_DEVICE : IOS_DEVICE);
-export const screenshotBase = (platform) => (platform === "MAC_OS" ? "fastlane/screenshots-macos" : "fastlane/screenshots");
+
+// fastlane's supply convention, which is what most repos already have — but a DEFAULT now, not a law.
+// These two paths were hardcoded, and the docs said so out loud ("symlink them if your layout differs"),
+// which is an honest way to describe a tool that cannot be pointed at your repo. `metadataDir` was always
+// configurable; there was never a reason for its sibling not to be.
+export const DEFAULT_SCREENSHOT_BASE = { IOS: "fastlane/screenshots", MAC_OS: "fastlane/screenshots-macos" };
+
+/** Where this platform's screenshots live: `screenshots` in the config, else the supply convention. */
+export const screenshotBase = (platform, config) =>
+  config?.screenshots?.[platform] ?? DEFAULT_SCREENSHOT_BASE[platform] ?? DEFAULT_SCREENSHOT_BASE.IOS;
+
+/**
+ * Locales with a local screenshot folder for this platform.
+ *
+ * Filtered through `VALID` for the same reason `fill` filters its upload loop through it: a folder named
+ * `de` instead of `de-DE` is not a locale Apple knows, and treating it as one would compare a real store
+ * localization against nothing. The caller reports what was dropped — see `unknownScreenshotDirs`.
+ */
+export function localScreenshotLocales(platform, config) {
+  const base = screenshotBase(platform, config);
+  if (!fs.existsSync(base)) return [];
+  return fs.readdirSync(base, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && VALID.has(d.name))
+    .map((d) => d.name)
+    .sort();
+}
+
+/** Screenshot folders that are NOT App Store locale codes — reported, never silently ignored. */
+export function unknownScreenshotDirs(platform, config) {
+  const base = screenshotBase(platform, config);
+  if (!fs.existsSync(base)) return [];
+  return fs.readdirSync(base, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && !VALID.has(d.name))
+    .map((d) => d.name)
+    .sort();
+}
 
 /** The local set for one locale: displayType -> Map(fileName -> md5 of the bytes). */
-export function localScreenshots(platform, locale) {
-  const dir = path.join(screenshotBase(platform), locale);
+export function localScreenshots(platform, locale, config) {
+  const dir = path.join(screenshotBase(platform, config), locale);
   const dev = deviceMap(platform);
   const local = {};
   if (!fs.existsSync(dir)) return local;
-  for (const f of fs.readdirSync(dir).filter((f) => f.endsWith(".png")).sort()) {
+  for (const f of fs.readdirSync(dir).filter((f) => IMAGE_FILE.test(f)).sort()) {
     const dt = dev[f.split("_")[0]];
     if (dt) (local[dt] ||= new Map()).set(f, md5(fs.readFileSync(path.join(dir, f))));
   }

@@ -107,8 +107,14 @@ export async function run(config, client) {
   console.log(`  declaring: ${claimed.length ? claimed.join(", ") : "(nothing)"}`);
 
   let gated = false;
+  // A PATCH that Apple refuses is a claim that never reached the store. Both failure paths below used
+  // to print red and `continue`, and the command still returned true — so `push` treated a family whose
+  // declaration never saved as a completed step. The `continue`s stay (one refused family must not hide
+  // the other three); the verdict now travels out with the return.
+  const failures = [];
   for (const family of Object.keys(UNAVAILABLE)) {
     const id = decls[family];
+    // Not a failure: Apple only holds declarations for the families the app actually ships on.
     if (!id) {
       console.error(yellow(`  no ${family} declaration`));
       continue;
@@ -119,6 +125,7 @@ export async function run(config, client) {
     });
     if (r.status >= 300) {
       console.error(red(`  ${family} draft ${r.status}`));
+      failures.push(`${family}: draft not saved (${r.status})`);
       continue;
     }
     if (publish) {
@@ -132,10 +139,16 @@ export async function run(config, client) {
         console.log(yellow(`  ${family}: draft saved — publish deferred (app not live yet)`));
       } else {
         console.error(red(`  ${family} publish ${p.status}`));
+        failures.push(`${family}: publish refused (${p.status})`);
       }
     } else {
       console.log(green(`  ${family}: draft saved`));
     }
+  }
+  if (failures.length) {
+    console.error(red(`accessibility: ${failures.length} declaration(s) did not save:`));
+    for (const f of failures) console.error(`  ${red("x")} ${f}`);
+    return false;
   }
   console.log(
     gated

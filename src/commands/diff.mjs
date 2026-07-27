@@ -3,7 +3,7 @@ import path from "node:path";
 import { green, yellow, red } from "../util.mjs";
 import { VALID } from "../locales.mjs";
 import { md5 } from "../upload.mjs";
-import { localScreenshots, remoteScreenshots, compareShots } from "../screenshots.mjs";
+import { localScreenshots, remoteScreenshots, compareShots, localScreenshotLocales } from "../screenshots.mjs";
 
 // [asc attribute, local metadata filename, isLongText]
 const VERSION_FIELDS = [
@@ -92,24 +92,31 @@ async function mediaDiff(config, client, platform, verLocs) {
   let diffs = 0;
   // Compared by CONTENT, not by count — the machinery lives in src/screenshots.mjs and is shared with
   // `preflight`, so the two commands cannot drift apart in what "in sync" means. The history is there.
-  const local = localScreenshots(platform, config.primaryLocale);
-  const remote = await remoteScreenshots(client, primary.id);
-  for (const dt of new Set([...Object.keys(local), ...Object.keys(remote)])) {
-    const c = compareShots(local[dt] || new Map(), remote[dt] || new Map());
-    if (!c) continue;
-    const label = `  ${yellow("screenshots")} ${dt.replace("APP_", "")}`;
-    if (c.kind === "count") {
-      diffs++;
-      console.log(`${label}: local ${c.local} / remote ${c.remote}  (@${config.primaryLocale})`);
-    } else if (c.kind === "renamed") {
-      diffs++;
-      console.log(`${label}: ${c.names.length} not on the store by name (${c.names.slice(0, 3).join(", ")})  (@${config.primaryLocale})`);
-    } else if (c.kind === "stale") {
-      diffs++;
-      console.log(`${label}: ${c.names.length} of ${c.of} differ in content (${c.names.slice(0, 3).join(", ")})  (@${config.primaryLocale})`);
-    } else {
-      // Apple did not give a checksum back. Say so rather than reporting a match we did not establish.
-      console.log(`${label}: ${c.names.length} present, checksum not reported by Apple — content unverified`);
+  // Every locale with a local set, for the reason preflight now does the same: `bridge` writes one
+  // folder per translated locale, and checking only the primary reported "in sync" about a listing
+  // whose other nineteen locales were showing last month's art.
+  for (const code of [...new Set([config.primaryLocale, ...localScreenshotLocales(platform, config)])]) {
+    const loc = verLocs.find((l) => l.attributes.locale === code);
+    if (!loc) continue;
+    const local = localScreenshots(platform, code, config);
+    const remote = await remoteScreenshots(client, loc.id);
+    for (const dt of new Set([...Object.keys(local), ...Object.keys(remote)])) {
+      const c = compareShots(local[dt] || new Map(), remote[dt] || new Map());
+      if (!c) continue;
+      const label = `  ${yellow("screenshots")} ${dt.replace("APP_", "")}`;
+      if (c.kind === "count") {
+        diffs++;
+        console.log(`${label}: local ${c.local} / remote ${c.remote}  (@${code})`);
+      } else if (c.kind === "renamed") {
+        diffs++;
+        console.log(`${label}: ${c.names.length} not on the store by name (${c.names.slice(0, 3).join(", ")})  (@${code})`);
+      } else if (c.kind === "stale") {
+        diffs++;
+        console.log(`${label}: ${c.names.length} of ${c.of} differ in content (${c.names.slice(0, 3).join(", ")})  (@${code})`);
+      } else {
+        // Apple did not give a checksum back. Say so rather than reporting a match we did not establish.
+        console.log(`${label}: ${c.names.length} present, checksum not reported by Apple — content unverified  (@${code})`);
+      }
     }
   }
   // Previews by content too — the count comparison this replaces had the screenshot bug in miniature:

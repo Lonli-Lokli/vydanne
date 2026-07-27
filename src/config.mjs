@@ -3,10 +3,12 @@ import fs from "node:fs";
 import { pathToFileURL } from "node:url";
 import { resolveLocales } from "./locales.mjs";
 import { resolveCredentials } from "./credentials.mjs";
+import { DEFAULT_SCREENSHOT_BASE } from "./screenshots.mjs";
+import { DEFAULT_PLAY_IMAGES } from "./play/images.mjs";
 
 // The public config surface — the drift guards assert each key is documented (README/SKILL) and typed
 // (types/index.d.ts). Add a config knob → document + type it, or the guards fail before publish.
-export const CONFIG_KEYS = ["bundleId", "primaryLocale", "asc", "platforms", "uiLocales", "metadataDir", "rating", "privacy", "iaps", "previews", "export", "ios", "google", "accessibility", "allowCrossStoreTerms"];
+export const CONFIG_KEYS = ["bundleId", "primaryLocale", "asc", "platforms", "uiLocales", "localeMap", "metadataDir", "screenshots", "rating", "ageRating", "privacy", "iaps", "previews", "export", "ios", "google", "accessibility", "bridge", "push", "reviewContact", "allowCrossStoreTerms"];
 
 // One `vydanne.config.mjs` per app (ESM, like zdymak.config.mjs) — nothing hard-coded. Secrets stay out:
 // credentials resolve from the environment, a gitignored .env, or ~/.appstoreconnect/config.json (see
@@ -34,11 +36,35 @@ export async function loadConfig(p) {
     keyId: creds.keyId,
     issuerId: creds.issuerId,
     uiLocales: raw.uiLocales || [],
+    // App code -> App Store locale, for codes Apple spells differently or does not know yet. Merged over
+    // the built-in table rather than replacing it, so an app declares only its exceptions.
+    localeMap: raw.localeMap || null,
     platforms: raw.platforms || ["IOS"],
     rating: raw.rating || "4+",
+    // Content descriptors for a rating above 4+. Null means "the 4+ shorthand", which `age-rating`
+    // expands to an all-NONE declaration; anything else must be declared, never guessed.
+    ageRating: raw.ageRating || null,
     privacy: raw.privacy || { collected: ["CRASH_DATA", "PERFORMANCE_DATA"], tracking: false },
     iaps: raw.iaps || [],
     metadataDir: raw.metadataDir || "fastlane/metadata",
+    // Where each platform's screenshots live. fastlane's supply convention by default — the same
+    // relationship `metadataDir` has always had to it, and for the same reason: a convention worth
+    // defaulting to is not a reason to be unable to point the tool at your own repo.
+    screenshots: raw.screenshots
+      ? { IOS: raw.screenshots.IOS || DEFAULT_SCREENSHOT_BASE.IOS, MAC_OS: raw.screenshots.MAC_OS || DEFAULT_SCREENSHOT_BASE.MAC_OS }
+      : null,
+    // App Review contact overrides. The PII itself still comes from the gitignored
+    // `<metadataDir>/review_information/*.txt` — this is only for what isn't a secret.
+    reviewContact: raw.reviewContact || null,
+    // `push: { skip: [...] }` — steps this app never runs. `--skip` adds to it per invocation; both are
+    // reported on every run, because a skipped step must never read as a completed one.
+    push: raw.push ? { skip: raw.push.skip || [] } : null,
+    // `bridge`: where zdymak wrote, and which of its output directories feed which store slot. Both
+    // default to zdymak's own conventions; both must be overridable, because `dir:` overrides in
+    // zdymak.config.mjs mean the directory name and the target name are not the same thing.
+    bridge: raw.bridge
+      ? { out: raw.bridge.out || null, apple: raw.bridge.apple || null, play: raw.bridge.play || null }
+      : null,
     // Terms the cross-store check must not flag for this app (see src/crossStore.mjs).
     allowCrossStoreTerms: raw.allowCrossStoreTerms || [],
     previews: raw.previews || null,
@@ -66,10 +92,16 @@ export async function loadConfig(p) {
           defaultLocale: raw.google.defaultLocale || raw.primaryLocale,
           aab: raw.google.aab || null,
           track: raw.google.track || "internal", // testing only — `prerelease` refuses production
-
+          // Play image type -> local source path. Merged over the defaults so an app overrides only the
+          // slots whose layout differs; the default for `icon` points at znachok's output, which is a
+          // sensible default for this portfolio and a mystery to anyone else, so it is overridable.
+          images: { ...DEFAULT_PLAY_IMAGES, ...(raw.google.images || {}) },
+          // Play supports per-language graphics. Uploading only to `defaultLocale` is a choice, not a
+          // platform limit — list locales here (or "*" for every local listing folder) to localize them.
+          imageLocales: raw.google.imageLocales || null,
         }
       : null,
   };
-  c.resolvedLocales = resolveLocales(c.uiLocales);
+  c.resolvedLocales = resolveLocales(c.uiLocales, c.localeMap);
   return c;
 }

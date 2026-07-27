@@ -4,7 +4,7 @@ import { green, yellow, red } from "../util.mjs";
 import { VALID } from "../locales.mjs";
 import { uploadAsset } from "../upload.mjs";
 import { reportCrossStore } from "../crossStore.mjs";
-import { deviceMap, screenshotBase } from "../screenshots.mjs";
+import { deviceMap, screenshotBase, IMAGE_FILE } from "../screenshots.mjs";
 
 // Version-localization fields (attr -> metadata filename) and AppInfo fields (name/subtitle, shared).
 const VERSION_TXT = { description: "description", keywords: "keywords", promotionalText: "promotional_text", whatsNew: "release_notes", marketingUrl: "marketing_url", supportUrl: "support_url" };
@@ -85,13 +85,39 @@ export async function run(config, client) {
     if (!skipMeta) {
       let failed = 0;
       const dropped = new Set();
-      const dirs = fs.readdirSync(config.metadataDir, { withFileTypes: true }).filter((d) => d.isDirectory() && VALID.has(d.name)).map((d) => d.name);
+      // Guarded: a metadataDir that doesn't exist used to surface as a raw ENOENT stack from readdirSync
+      // — the Play half of this command has always said it in a sentence, and there is no reason the
+      // Apple half should be the one that throws.
+      if (!fs.existsSync(config.metadataDir)) {
+        console.error(red(`fill ${platform}: no metadata directory at ${config.metadataDir}`));
+        console.error("  Create it (one folder per App Store locale), or point `metadataDir` at yours.");
+        return false;
+      }
+      const all = fs.readdirSync(config.metadataDir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
+      const dirs = all.filter((d) => VALID.has(d));
+      // A folder Apple has no locale for is dropped from the upload — silently, until now. `de` instead
+      // of `de-DE` is the exact mistake locales.mjs calls the #1 gotcha, and the old filter made it look
+      // like the locale had simply been forgotten. Naming it costs one line and saves a release.
+      const strays = all.filter((d) => !VALID.has(d));
+      if (strays.length) console.log(yellow(`  ${strays.length} folder(s) are not App Store locale codes, skipped: ${strays.join(", ")} (\`vydanne locales\` lists the valid ones)`));
       for (const code of dirs) {
         const folder = path.join(config.metadataDir, code);
         const read = (f) => { const p = path.join(folder, `${f}.txt`); return fs.existsSync(p) ? fs.readFileSync(p, "utf8").replace(/\n+$/, "") : null; };
         // version localization (description/keywords/promo/whatsNew/urls)
         let vl = verLocs.find((l) => l.attributes.locale === code);
-        if (!vl) { const c = await client.post(`/v1/appStoreVersionLocalizations`, { data: { type: "appStoreVersionLocalizations", attributes: { locale: code }, relationships: { appStoreVersion: { data: { type: "appStoreVersions", id: v.id } } } } }); vl = c.json.data; verLocs.push(vl); }
+        if (!vl) {
+          const c = await client.post(`/v1/appStoreVersionLocalizations`, { data: { type: "appStoreVersionLocalizations", attributes: { locale: code }, relationships: { appStoreVersion: { data: { type: "appStoreVersions", id: v.id } } } } });
+          vl = c.json.data;
+          // A refused POST leaves `vl` undefined, and the PATCH below then reads `.id` off it — a raw
+          // TypeError that kills the whole fill on one bad locale. Report the locale Apple refused and
+          // carry on with the rest, the way every other per-locale failure here behaves.
+          if (!vl) {
+            console.error(red(`    ✗ ${code}: could not create localization — ${JSON.stringify(c.json?.errors?.[0]?.detail || c.json).slice(0, 160)}`));
+            failed++;
+            continue;
+          }
+          verLocs.push(vl);
+        }
         const vattrs = {};
         for (const [k, f] of Object.entries(VERSION_TXT)) { const t = read(f); if (t != null) vattrs[k] = t; }
         if (Object.keys(vattrs).length) {
@@ -129,16 +155,19 @@ export async function run(config, client) {
 }
 
 async function uploadScreenshots(config, client, platform, verLocs) {
-  const base = screenshotBase(platform);
+  const base = screenshotBase(platform, config);
   const DEV = deviceMap(platform);
   if (!fs.existsSync(base)) return;
-  for (const code of fs.readdirSync(base).filter((d) => VALID.has(d))) {
+  const dirs = fs.readdirSync(base, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
+  const strays = dirs.filter((d) => !VALID.has(d));
+  if (strays.length) console.log(yellow(`    ${strays.length} screenshot folder(s) are not App Store locale codes, skipped: ${strays.join(", ")}`));
+  for (const code of dirs.filter((d) => VALID.has(d))) {
     const loc = verLocs.find((l) => l.attributes.locale === code);
     // Said, not skipped: with VYDANNE_SKIP_METADATA=1 (or a screenshots folder for a locale that has no
     // metadata folder) no localization was created above, and a silent `continue` here reports success
     // for a locale whose screenshots never left the disk.
     if (!loc) { console.log(yellow(`    ${code}: no App Store localization — screenshots skipped (run fill with metadata to create it)`)); continue; }
-    const files = fs.readdirSync(path.join(base, code)).filter((f) => f.endsWith(".png")).sort();
+    const files = fs.readdirSync(path.join(base, code)).filter((f) => IMAGE_FILE.test(f)).sort();
     const byDev = {};
     const unknown = [];
     for (const f of files) { const dt = DEV[f.split("_")[0]]; dt ? (byDev[dt] ||= []).push(f) : unknown.push(f); }

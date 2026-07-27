@@ -65,6 +65,9 @@ try {
     console.log(`supported (${Object.keys(r.supported).length}):`);
     for (const [ui, asc] of Object.entries(r.supported)) console.log(`  ${ui} -> ${asc}`);
     console.log(`unsupported (${r.unsupported.length}) [no App Store language -> fall back to primary]: ${r.unsupported.join(", ")}`);
+    // A localeMap entry pointing at a code Apple does not have is a config mistake, not a missing
+    // language — it would otherwise be indistinguishable from the line above.
+    if (r.invalid?.length) console.log(`\x1b[31minvalid localeMap (${r.invalid.length}) [not an App Store code]: ${r.invalid.join(", ")}\x1b[0m`);
   } else if (store === "google") {
     const cfg = await loadConfig(cfgPath);
     if (!cfg.google) throw new Error("vydanne: no `google` block in config — add packageName + a service-account key");
@@ -121,6 +124,8 @@ usage: vydanne <command> [--apply] [--config vydanne.config.mjs]
                   to name the version instead of reading it off the newest build.
 ✎ push            the whole pipeline, in order: prepare → fill → previews → age-rating →
                   review-contact → accessibility → preflight. Stops at the first failure.
+                  --skip <step>[,<step>] drops steps that don't apply (prepare/preflight can't be
+                  skipped); every skip is reported again at the end, so green still means green.
                   Ends at a green preflight — Add to Review + Submit stay yours, in the web UI.
 ✎ fill            metadata + screenshots + previews (native; iOS & macOS separate)
 ✎ age-rating      set the age rating (AppInfo declaration)

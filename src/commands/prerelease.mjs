@@ -127,7 +127,7 @@ export async function run(config, client, credentials) {
     // right answer for an accident and a dead end for a re-run, so say which it is.
     if (/already exists|redundant binary|previously uploaded/i.test(text)) {
       console.error(red("  Apple already holds this build number."));
-      console.error("  Bump CFBundleVersion (Scripts/build-number.sh in the games) and re-archive.");
+      console.error("  Bump CFBundleVersion (the build number, not the marketing version) and re-archive.");
     } else {
       console.error(red("  upload failed:"));
       console.error(indent(text));
@@ -216,6 +216,12 @@ export const LOCKED_STATES = new Set([
   "PENDING_APPLE_RELEASE",
   "READY_FOR_SALE",
   "REPLACED_WITH_NEW_VERSION",
+  // Both removed-from-sale states are shipped versions that Apple will not reopen for editing.
+  // client.mjs has always treated them as dead for `editVersion()`; leaving them out here meant
+  // `prepare` would "reuse" one and hand every later step a version whose first write Apple refuses —
+  // the refusal arriving as an opaque INVALID_STATE instead of the sentence below it.
+  "REMOVED_FROM_SALE",
+  "DEVELOPER_REMOVED_FROM_SALE",
 ]);
 
 /**

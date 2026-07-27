@@ -141,14 +141,35 @@ export async function ensureVersion(client, config, platform, versionString) {
   }
 
   const how = copyright ? ", copyright set" : "";
-  console.log(green(`  created version ${versionString} — PREPARE_FOR_SUBMISSION, releaseType MANUAL${how}`));
+  // Said in the tense that happened. A dry run reported "created version 1.2" in green immediately
+  // after saying it would POST one — two lines that contradict each other, and the green one is the
+  // one people remember.
+  console.log(client.dryRun
+    ? yellow(`  WOULD create version ${versionString} — PREPARE_FOR_SUBMISSION, releaseType MANUAL${how}`)
+    : green(`  created version ${versionString} — PREPARE_FOR_SUBMISSION, releaseType MANUAL${how}`));
   return r.json.data;
 }
 
 export async function run(config, client) {
-  const platform = (config.platforms && config.platforms[0]) || "IOS";
   await client.findApp(config.bundleId);
+  // EVERY declared platform. iOS and macOS are separate App Store versions with separate records, and
+  // preparing only `platforms[0]` left the second one with nothing editable — so `fill MAC_OS` refused
+  // ("no editable version") on an app whose iOS draft had just been created, and `push` stopped there.
+  // `fill`, `previews` and `preflight` have always looped; this is the command that creates what they
+  // loop over.
+  let ok = true;
+  for (const platform of config.platforms) {
+    if (!(await prepareOne(config, client, platform))) ok = false;
+  }
+  if (!ok) return false;
 
+  console.log("prepare done — the version is editable.");
+  for (const line of NEXT_STEPS) console.log(line);
+  console.log(yellow("  Submitting for App Store review stays manual, by design."));
+  return true;
+}
+
+async function prepareOne(config, client, platform) {
   console.log(green(`prepare → App Store version (${platform})`));
 
   const { build, marketing } = await newestBuildWithVersion(client);
@@ -195,9 +216,5 @@ export async function run(config, client) {
   } else {
     await pointVersionAtBuild(client, config, build, version);
   }
-
-  console.log("prepare done — the version is editable.");
-  for (const line of NEXT_STEPS) console.log(line);
-  console.log(yellow("  Submitting for App Store review stays manual, by design."));
   return true;
 }

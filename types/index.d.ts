@@ -205,7 +205,8 @@ export declare function toAsc(code: string): string | null;
 export declare const VALID: Set<string>;
 export declare const CONFIG_KEYS: readonly string[];
 export declare const COMMAND_NAMES: readonly CommandName[];
-/** `writes` marks a command that mutates the STORE — those are dry-run unless the CLI gets `--apply`. */
-export declare const COMMANDS: Record<string, { mod: string; client: boolean; writes?: boolean }>;
+/** `writes` marks a command that mutates the STORE — those are dry-run unless the CLI gets `--apply`.
+ *  `credentials` marks the one command (prerelease) whose altool child authenticates itself. */
+export declare const COMMANDS: Record<string, { mod: string; client?: boolean; credentials?: boolean; writes?: boolean }>;
 
 export default VydanneConfig;

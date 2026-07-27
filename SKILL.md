@@ -176,6 +176,20 @@ blocking; `allowCrossStoreTerms: [...]` in the config silences a specific one, a
 `VYDANNE_ALLOW_CROSS_STORE=1` overrides a single run. This is a rejection that surfaces days later in
 one locale out of twenty, so it is checked where it is free to fix.
 
+**The pipeline has ONE working order** — `prepare` → `fill` → `previews` → `age-rating` →
+`review-contact` → `accessibility` → `preflight` → **a human submits**. `prepare` must be first (until
+the draft version exists, nothing has anywhere to write) and `preflight` last (green must be measured
+after the writes it blesses). `push` runs exactly that sequence — each step the same `run` as the
+standalone command, on the same client, stopping at the first failure — so prefer `vydanne push` over
+re-deriving the order; the near-miss that motivated it was `fill` pointed at a live-only app out of
+order. The two flows differ only at step one and `push` absorbs it: a FIRST release already has a
+PREPARE_FOR_SUBMISSION version (creating the app record made it), so `prepare` is a find-and-reuse
+no-op; an UPDATE has only the read-only live version until `prepare` creates the next one. On a live
+app a DRY `push` stops at `fill` — the draft the later steps target doesn't exist until `prepare` is
+applied — and says so up front; `prepare --apply` (a draft, not a submission) then a dry `push`
+previews the whole plan. `prerelease` is deliberately not a step (macOS-only, shells out to altool);
+run it whenever the build is ready — `prepare` attaches the newest build either way.
+
 `prepare` creates the version to write INTO, and is REQUIRED as the first push step on any app that
 already has a version on sale. Every other Apple command finds its target through
 `client.editVersion()`, which returns the first version Apple has not marked dead; when the only
@@ -222,9 +236,10 @@ The AAB binary and the (YouTube-URL) promo video stay outside vydanne.
 
 ## `--apply` — writes are opt-in
 
-**Every store-mutating command is a DRY RUN without `--apply`**: `prepare` · `fill` · `previews` ·
-`age-rating` · `review-contact` · `accessibility` · `prerelease` (marked `✎` in `vydanne help`). They read the store,
-print each write they would make, and send nothing. Read-only commands ignore the flag.
+**Every store-mutating command is a DRY RUN without `--apply`**: `prepare` · `push` · `fill` ·
+`previews` · `age-rating` · `review-contact` · `accessibility` · `prerelease` (marked `✎` in
+`vydanne help`). They read the store, print each write they would make, and send nothing. Read-only
+commands ignore the flag.
 
 Never reach for `--apply` to "check whether it works" — the dry run IS the check, and it walks the whole
 plan rather than stopping at the first locale. Its closing count is what you compare against `diff`.
@@ -242,9 +257,10 @@ through that client. **A new command that touches the store must be marked `writ
 
 ## Flow
 
-config → **write the English master listing (ASO, research-grounded)** → `preflight` (char limits) → fan
-out one copywriter agent per locale → media from zdymak → `fill` + `previews` + declarations (read the
-dry run, then re-run with `--apply`) → `diff` → `preflight` (must be green) → **a human submits**.
+config → **write the English master listing (ASO, research-grounded)** → fan out one copywriter agent
+per locale → media from zdymak → build via `prerelease --apply` whenever it is ready → `push` (read the
+dry run, then re-run with `--apply` — it is prepare → fill → previews → age-rating → review-contact →
+accessibility → preflight, stopping at the first failure) → `diff` to confirm → **a human submits**.
 
 ## Gotchas it encodes (don't re-derive)
 

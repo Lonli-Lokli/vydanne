@@ -14,6 +14,10 @@ export const COMMANDS = {
   // listing order: on an app with a version already on sale, `fill` has nothing valid to target
   // until this has run once.
   prepare: { mod: "prepare", client: true, writes: true },
+  // The pipeline in its one working order — prepare → fill → previews → age-rating → review-contact →
+  // accessibility → preflight — because that order lived in nobody's head, and a release nearly got
+  // written to a live listing while everyone re-derived it. Stops at the first failure; never submits.
+  push: { mod: "push", client: true, writes: true },
   fill: { mod: "fill", client: true, writes: true },
   "age-rating": { mod: "ageRating", client: true, writes: true },
   "review-contact": { mod: "reviewContact", client: true, writes: true },

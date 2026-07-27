@@ -12,6 +12,12 @@ export type CommandName =
    * `fill` to write into. Override the version with VYDANNE_VERSION.
    */
   | 'prepare'
+  /**
+   * The whole release pipeline in its one working order: prepare → fill → previews → age-rating →
+   * review-contact → accessibility → preflight. Dry-run without --apply; stops at the first failure;
+   * never submits — Add to Review and Submit stay manual.
+   */
+  | 'push'
   | 'fill'
   | 'age-rating'
   | 'review-contact'

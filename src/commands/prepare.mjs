@@ -103,8 +103,17 @@ export async function ensureVersion(client, config, platform, versionString) {
     // to keep right, and it is already the list that decides whether a build may be re-pointed.
     if (LOCKED_STATES.has(state)) {
       console.error(red(`  version ${versionString} is ${state} — Apple will not let it be edited.`));
-      console.error("  Withdrawing that submission has reviewer-facing consequences, so it stays your");
-      console.error("  call: withdraw it in App Store Connect, then re-run this.");
+      // Two locked cases, two different fixes — telling someone to "withdraw" a version that is ON
+      // SALE is advice they cannot take. Shipped once already means the next release needs a HIGHER
+      // number, which is the everyday case: the newest build still declares the shipped version
+      // because MARKETING_VERSION was never bumped after release.
+      if (state === "READY_FOR_SALE" || state === "REPLACED_WITH_NEW_VERSION") {
+        console.error(`  That version has shipped; the next release needs a higher number. Bump`);
+        console.error(`  MARKETING_VERSION and re-archive — or name it now: VYDANNE_VERSION=<next> vydanne prepare --apply`);
+      } else {
+        console.error("  Withdrawing that submission has reviewer-facing consequences, so it stays your");
+        console.error("  call: withdraw it in App Store Connect, then re-run this.");
+      }
       return null;
     }
     console.log(green(`  version ${versionString} already exists (${state}) — reusing it`));

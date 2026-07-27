@@ -183,8 +183,9 @@ DRY RUN — 'fill' will not change App Store Connect. Add --apply to write.
 DRY RUN — 40 store write(s) withheld. Re-run with --apply to perform them.
 ```
 
-The commands this applies to are marked `✎` in `vydanne help`: `fill`, `previews`, `age-rating`,
-`review-contact`, `accessibility`, `prerelease`. Everything else only reads, and ignores the flag.
+The commands this applies to are marked `✎` in `vydanne help`: `prepare`, `push`, `fill`, `previews`,
+`age-rating`, `review-contact`, `accessibility`, `prerelease`. Everything else only reads, and ignores
+the flag.
 
 Two details worth knowing:
 
@@ -206,8 +207,9 @@ Two details worth knowing:
 
 | Command | In plain English |
 |---|---|
-| `preflight` | **Run this first.** Checks the listing is complete, nothing is over a character limit, and no locale mentions the other app store. Green means submittable. |
+| `preflight` | **Run this first.** Checks the listing is complete, nothing is over a character limit, no locale mentions the other app store — and that the screenshots on the store are your *current* ones, not a stale set. Green means submittable. |
 | `prepare` | Starts the next release: creates the App Store version you're preparing and attaches your newest build to it. **Needed before `fill` on an app that already has a version on sale** — until a draft exists there is nothing for the listing text to go into. Reuses the draft if it's already there, so it's safe to re-run. It does *not* submit. |
+| `push` | **The whole release, one command**: runs `prepare` → `fill` → `previews` → `age-rating` → `review-contact` → `accessibility` → `preflight`, in that order, stopping at the first failure. Dry run without `--apply`, like everything else. Ends at a green preflight — it never submits. |
 | `diff` | Shows exactly what's different between your files and what's live. Nothing is changed — a safe preview. |
 | `fill` | Uploads your listing text and screenshots. Handles iPhone, iPad and Mac. Refuses to upload text that names the other mobile platform. |
 | `previews` | Uploads App Preview videos. |
@@ -223,31 +225,47 @@ Two details worth knowing:
 
 For **Google Play**, add `--store google` to `inspect`, `diff`, `preflight`, `fill`, or `prerelease`.
 
-`prepare`, `fill`, `previews`, `age-rating`, `review-contact`, `accessibility` and `prerelease` change the
-store, so they need [`--apply`](#--apply-or-nothing-happens); without it they report and exit.
+`prepare`, `push`, `fill`, `previews`, `age-rating`, `review-contact`, `accessibility` and `prerelease`
+change the store, so they need [`--apply`](#--apply-or-nothing-happens); without it they report and exit.
 
-### Shipping an update to an app that's already live
+## The release pipeline — the order matters
 
-The first release is the easy case: App Store Connect hands you a version in *Prepare for Submission* and
-every command has something to write into. After that version goes on sale, it doesn't — a live version is
-read-only, and there is no draft until someone makes one. That's what `prepare` is for:
+A release is the same seven steps in the same order, every time. `prepare` must come first (until the
+draft version exists, nothing has anywhere to write) and `preflight` must come last (green has to be
+measured *after* the writes it blesses, or it blesses nothing). That ordering is exactly the kind of
+thing that lives in someone's head until the day it doesn't — so `push` runs it for you, stopping at the
+first failure, and each step's own refusals still apply:
 
 ```sh
-npx vydanne prepare --apply       # create version 1.2, attach the newest build
-npx vydanne fill --apply          # listing text + screenshots, into 1.2
-npx vydanne preflight             # green means submittable
-# then, in App Store Connect: Add to Review -> Submit
+npx vydanne prerelease --apply    # whenever the build is ready — before or after push is fine
+npx vydanne push                  # DRY RUN of the whole pipeline: read the plan
+npx vydanne push --apply          # do it: prepare → fill → previews → age-rating
+                                  #        → review-contact → accessibility → preflight
+# then, in App Store Connect: Add to Review -> Submit  (always you, never vydanne)
 ```
 
-Skip `prepare` and `fill` has nowhere valid to aim: it falls back to the version **on sale** and tries to
-rewrite the listing your customers are reading. Run `prepare` first and that stops being possible.
+The two flows differ only at the first step, and `push` absorbs the difference:
 
-The version number comes from the newest build's own `CFBundleShortVersionString`, so it can't drift from
-the binary. Preparing a version before its build exists is the one case that needs telling:
+- **First release.** Creating the app record in App Store Connect already gave you a version in *Prepare
+  for Submission*, so `prepare` finds it and reuses it — a no-op that simply reports what's there.
+- **An update to a live app.** A version on sale is read-only and there is no draft until someone makes
+  one. Here `prepare` is the step that matters: it creates the next version (numbered from the newest
+  build's own `CFBundleShortVersionString`, so it can't drift from the binary) and attaches that build.
+
+Skip `prepare` on a live app and `fill` has nowhere valid to aim — it refuses, rather than falling back
+to the version **on sale** and rewriting the listing your customers are reading.
+
+One wrinkle worth knowing: on a live app, a *dry run* of `push` stops at `fill`, because the draft the
+later steps write into doesn't exist until `prepare` is applied. `push` says so up front. Creating the
+draft is safe — it isn't a submission — so `vydanne prepare --apply` first, then a dry `push`, previews
+the whole plan. Preparing a version before its build exists is the one case that needs telling:
 
 ```sh
 VYDANNE_VERSION=1.2 npx vydanne prepare --apply
 ```
+
+Prefer doing it step by step? Every step is its own command (the table above), and `push` is nothing
+more than those commands in the right order.
 
 <br>
 

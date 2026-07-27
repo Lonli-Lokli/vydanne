@@ -119,6 +119,9 @@ usage: vydanne <command> [--apply] [--config vydanne.config.mjs]
                   Run this FIRST on an app that already has a version on sale — until it has,
                   there is no draft for \`fill\` to write into. Never submits; VYDANNE_VERSION=<x>
                   to name the version instead of reading it off the newest build.
+✎ push            the whole pipeline, in order: prepare → fill → previews → age-rating →
+                  review-contact → accessibility → preflight. Stops at the first failure.
+                  Ends at a green preflight — Add to Review + Submit stay yours, in the web UI.
 ✎ fill            metadata + screenshots + previews (native; iOS & macOS separate)
 ✎ age-rating      set the age rating (AppInfo declaration)
 ✎ review-contact  App Review contact from the gitignored files

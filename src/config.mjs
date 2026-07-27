@@ -39,6 +39,19 @@ export async function loadConfig(p) {
     allowCrossStoreTerms: raw.allowCrossStoreTerms || [],
     previews: raw.previews || null,
     export: raw.export || { encryption: "standard" },
+    // What the app claims to support, for the Accessibility Nutrition Labels. Passed through RAW and
+    // deliberately NOT defaulted: `accessibility` validates its own block and must be able to tell
+    // "declared nothing" from "declared everything false" — a default here would turn a missing block
+    // into a silent set of claims, which is the one thing that command exists to refuse.
+    accessibility: raw.accessibility || null,
+    // iOS build upload (`prerelease`). Normalised like `google` below so the shape is stable whether or
+    // not the block is present.
+    ios: raw.ios
+      ? {
+          ipa: raw.ios.ipa || null, // VYDANNE_IPA overrides, resolved in prerelease.resolveIpa
+          testFlightGroup: raw.ios.testFlightGroup || null, // internal groups only; external is refused
+        }
+      : null,
     // Google Play. serviceAccountKey resolves from PLAY_JSON_KEY_FILE env first (keep the secret path out
     // of the committed config). metadataDir follows fastlane supply's convention (fastlane/metadata/android).
     google: raw.google

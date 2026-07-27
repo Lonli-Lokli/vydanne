@@ -25,8 +25,11 @@ export async function run(config, client) {
   let actionable = 0; // differences `fill`/`previews` would actually change (release_notes on a 1.0 is benign)
 
   for (const platform of config.platforms) {
-    const v = await client.editVersion(platform);
-    if (!v) { console.log(red(`${platform}: no editable version`)); continue; }
+    // allowLive: comparing local against the version ON SALE is a legitimate question and often the
+    // reason to run this before preparing a release. The state is printed below, so it is never unclear
+    // WHICH version the comparison is against — and `fill` no longer targets a live one either way.
+    const v = await client.editVersion(platform, { allowLive: true });
+    if (!v) { console.log(red(`${platform}: no version at all`)); continue; }
     console.log(`${platform}  v${v.attributes.versionString} ${v.attributes.appStoreState}`);
     const verLocs = await client.versionLocalizations(v.id);
     const localDirs = fs.existsSync(config.metadataDir)

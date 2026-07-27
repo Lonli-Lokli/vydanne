@@ -172,7 +172,11 @@ export declare class Client {
   post(path: string, body: unknown): Promise<{ status: number; json: any }>;
   patch(path: string, body: unknown): Promise<{ status: number; json: any }>;
   del(path: string): Promise<{ status: number; json: any }>;
-  editVersion(platform: Platform): Promise<any>;
+  /**
+   * The version being prepared, or null when none exists. `allowLive` (read-only commands only) falls
+   * back to the version on sale; writes must never target it.
+   */
+  editVersion(platform: Platform, opts?: { allowLive?: boolean }): Promise<any>;
   appInfo(): Promise<any>;
   versionLocalizations(versionId: string): Promise<any[]>;
   localization(id: string, kind?: string): Promise<Record<string, unknown>>;

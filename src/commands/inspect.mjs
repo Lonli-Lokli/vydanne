@@ -3,8 +3,10 @@ export async function run(config, client) {
   await client.findApp(config.bundleId);
   console.log(`APP ${client.app.attributes.name} (${config.bundleId})  id=${client.appId}  primary=${client.app.attributes.primaryLocale}`);
   for (const platform of config.platforms) {
-    const v = await client.editVersion(platform);
-    if (!v) { console.log(`  ${platform}: no editable version`); continue; }
+    // allowLive: this command's whole job is reporting what is in the store, and on an app with nothing
+    // in preparation the live version is the answer — not something to withhold.
+    const v = await client.editVersion(platform, { allowLive: true });
+    if (!v) { console.log(`  ${platform}: no version at all`); continue; }
     const locs = await client.versionLocalizations(v.id);
     console.log(`  ${platform}: v${v.attributes.versionString}  ${v.attributes.appStoreState}  localizations=${locs.length}`);
     const primary = locs.find((l) => l.attributes.locale === config.primaryLocale) || locs[0];

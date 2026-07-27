@@ -79,10 +79,28 @@ export class Client {
     return app;
   }
 
-  async editVersion(platform) {
+  /**
+   * The version being PREPARED — or null when there isn't one.
+   *
+   * This used to fall back to `data[0]`, the LIVE version, whenever nothing editable existed. The
+   * fallback was silent and it defeated its own callers: `fill`, `preflight`, `reviewContact` and
+   * `previews` each test `if (!v)` and report "no editable version", and not one of those branches could
+   * be reached on an app that had shipped once. What happened instead was worse than an error — `fill`
+   * aimed its description/whatsNew PATCHes at the listing customers were reading, and `preflight`
+   * validated that same live listing and printed "no blockers", calling a release submittable when
+   * there was nothing to submit.
+   *
+   * So a write is never handed the live version by default. Read-only commands (`inspect`, `diff`) pass
+   * `allowLive: true`, because "how does local compare with what is on sale" is a real question and that
+   * is the only version they could ask it about. Everything else gets null and says so — and now has
+   * `prepare` to point at, which is the command that makes an editable version exist.
+   */
+  async editVersion(platform, { allowLive = false } = {}) {
     const { json } = await this.get(`/v1/apps/${this.appId}/appStoreVersions?filter[platform]=${platform}&limit=10`);
     const data = json.data || [];
-    return data.find((v) => !DEAD_VERSION.includes(v.attributes.appStoreState)) || data[0] || null;
+    const editable = data.find((v) => !DEAD_VERSION.includes(v.attributes.appStoreState));
+    if (editable) return editable;
+    return allowLive ? data[0] || null : null;
   }
 
   async appInfo() {

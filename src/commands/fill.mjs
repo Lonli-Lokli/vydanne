@@ -65,9 +65,17 @@ export async function run(config, client) {
   const infoLocs = info ? (await client.get(`/v1/appInfos/${info.id}/appInfoLocalizations?limit=200`)).json.data || [] : [];
 
   for (const platform of config.platforms) {
+    // No allowLive, deliberately: this is the command whose PATCHes would otherwise land on the listing
+    // customers are reading. Refusing is the whole point — an unwritten release note is recoverable, a
+    // rewritten live listing is not.
     const v = await client.editVersion(platform);
-    if (!v) { console.error(red(`fill ${platform}: no editable version`)); continue; }
-    console.log(green(`fill ${platform} (metadata=${!skipMeta} screenshots=${!skipShots})...`));
+    if (!v) {
+      console.error(red(`fill ${platform}: no editable version — refusing to write to the live listing.`));
+      console.error("  `vydanne prepare --apply` creates the version to fill, then re-run this.");
+      ok = false;
+      continue;
+    }
+    console.log(green(`fill ${platform} (metadata=${!skipMeta} screenshots=${!skipShots}) -> ${v.attributes.versionString} ${v.attributes.appStoreState}`));
     const verLocs = await client.versionLocalizations(v.id);
 
     if (!skipMeta) {

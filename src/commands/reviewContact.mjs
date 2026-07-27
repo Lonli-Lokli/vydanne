@@ -15,7 +15,11 @@ export async function run(config, client) {
   if (!attributes.contactEmail) { console.error(red(`review-contact: ${dir}/*.txt missing`)); return false; }
   await client.findApp(config.bundleId);
   const v = await client.editVersion(config.platforms[0]);
-  if (!v) { console.error(red("review-contact: no editable version")); return false; }
+  if (!v) {
+    console.error(red("review-contact: no editable version — nothing to attach the contact to."));
+    console.error("  `vydanne prepare --apply` creates the version being submitted, then re-run this.");
+    return false;
+  }
   const { json } = await client.get(`/v1/appStoreVersions/${v.id}/appStoreReviewDetail`);
   const existing = json.data;
   const r = existing?.id

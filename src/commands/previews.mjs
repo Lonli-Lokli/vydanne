@@ -10,7 +10,11 @@ export async function run(config, client) {
   const specs = config.previews || defaultSpecs(config);
   for (const s of specs) {
     const v = await client.editVersion(s.platform);
-    if (!v) { console.error(red(`  ${s.platform}: no version`)); continue; }
+    if (!v) {
+      console.error(red(`  ${s.platform}: no editable version — nothing to upload previews to.`));
+      console.error("  `vydanne prepare --apply` creates the version being submitted, then re-run this.");
+      continue;
+    }
     const locs = await client.versionLocalizations(v.id);
     for (const code of s.locales || [config.primaryLocale]) {
       const loc = locs.find((l) => l.attributes.locale === code);

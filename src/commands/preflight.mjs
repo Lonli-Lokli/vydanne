@@ -10,8 +10,13 @@ export async function run(config, client) {
   if (res.unsupported.length) notes.push(`UI locales with no App Store listing (fall back to ${config.primaryLocale}): ${res.unsupported.join(", ")}`);
 
   for (const platform of config.platforms) {
+    // A blocker, and now reachable: this guard existed before but editVersion() handed back the LIVE
+    // version instead of null, so preflight validated the shipped listing and called it submittable.
     const v = await client.editVersion(platform);
-    if (!v) { problems.push(`${platform}: no editable version`); continue; }
+    if (!v) {
+      problems.push(`${platform}: no editable version — run \`vydanne prepare --apply\` to create one`);
+      continue;
+    }
     console.log(`  ${platform}: version ${v.attributes.versionString} (${v.attributes.appStoreState})`);
     const locs = await client.versionLocalizations(v.id);
     const ascLocales = [...new Set([config.primaryLocale, ...Object.values(res.supported)])];

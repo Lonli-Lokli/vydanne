@@ -164,7 +164,14 @@ live) · `privacy` (prints answers for the UI — the API can't reach Apple's ir
 RGB flatten) · `compliance` (US self-classification PDF) · `diff` (what differs vs live) · `preflight`
 (completeness gate) · `inspect` · `auth` (what credentials resolved, and from where) · `locales` · `version`.
 
-`prerelease` (**Play only**) uploads an `.aab` to a **closed testing track** with release notes, inside one
+`prerelease` uploads the BUILD. On Apple it validates and uploads the `.ipa` to **TestFlight** via
+`xcrun altool` — the one command that shells out, because the ASC REST API has never carried a binary,
+which also makes it macOS-only. `.ipa` comes from `ios.ipa` / `VYDANNE_IPA` (a directory takes its
+newest), the build number from the archive's own `CFBundleVersion`, and `ios.testFlightGroup` may add
+it to an **internal** group. External groups are REFUSED — they need Beta App Review, a submission by
+another name — and App Store review is never submitted, mirroring the Play side refusing `production`.
+
+With `--store google` it uploads an `.aab` to a **closed testing track** with release notes, inside one
 edit transaction. `production` is REFUSED — not flag-gated — so no argument combination ships to the
 public; promoting the tested build stays a human's job, mirroring the Apple side never submitting. Track
 comes from `google.track` / `VYDANNE_TRACK`, default `internal`; the bundle from `google.aab` /

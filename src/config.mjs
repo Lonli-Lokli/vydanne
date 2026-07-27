@@ -6,7 +6,7 @@ import { resolveCredentials } from "./credentials.mjs";
 
 // The public config surface — the drift guards assert each key is documented (README/SKILL) and typed
 // (types/index.d.ts). Add a config knob → document + type it, or the guards fail before publish.
-export const CONFIG_KEYS = ["bundleId", "primaryLocale", "asc", "platforms", "uiLocales", "metadataDir", "rating", "privacy", "iaps", "previews", "export", "google"];
+export const CONFIG_KEYS = ["bundleId", "primaryLocale", "asc", "platforms", "uiLocales", "metadataDir", "rating", "privacy", "iaps", "previews", "export", "ios", "google", "accessibility"];
 
 // One `vydanne.config.mjs` per app (ESM, like zdymak.config.mjs) — nothing hard-coded. Secrets stay out:
 // credentials resolve from the environment, a gitignored .env, or ~/.appstoreconnect/config.json (see

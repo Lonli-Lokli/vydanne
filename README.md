@@ -196,10 +196,38 @@ VYDANNE_COMMIT=1 npx vydanne fill --store google   # actually do it
 #   Windows PowerShell:  $env:VYDANNE_COMMIT = "1"; npx vydanne fill --store google
 ```
 
-### `prerelease` — the build, to a testing track
+### `prerelease` — the build, to testers
 
-`fill` writes the *listing*; `prerelease` uploads the **binary** to a **closed testing track** with
-release notes, all inside one edit transaction:
+`fill` writes the *listing*; `prerelease` uploads the **binary** — to TestFlight on Apple, or to a
+closed testing track on Play. Neither submits anything for review.
+
+**Apple — TestFlight**
+
+```sh
+npx vydanne prerelease            # validate, upload, wait for processing
+```
+
+```js
+ios: {
+  ipa: "./dist",                  // a file, or a directory whose NEWEST .ipa is taken
+  testFlightGroup: "Internal",    // optional; INTERNAL groups only
+}
+```
+
+The App Store Connect REST API has never accepted a binary, so this is the one command that shells
+out — to `xcrun altool`, which ships with Xcode and authenticates from the same
+`~/.appstoreconnect/private_keys` key `vydanne auth` reports. That makes it **macOS-only**, which it
+checks up front. The archive is validated before it is uploaded, so the common refusals (bad
+entitlements, missing icons, a version Apple already holds) cost seconds rather than a full transfer.
+
+Build numbers come from the archive's own `CFBundleVersion` — re-uploading one Apple already holds
+fails loudly instead of quietly replacing a binary.
+
+**External TestFlight groups are refused.** Distributing to them requires Beta App Review, which is a
+submission by another name; internal groups are the exact parallel of Play's `internal` track, and on
+a paid app they are the testers who install without buying it.
+
+**Google Play — a closed track**
 
 ```sh
 npx vydanne prerelease --store google                    # dry run

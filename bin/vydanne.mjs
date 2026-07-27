@@ -62,7 +62,8 @@ try {
     const spec = COMMANDS[cmd];
     const { run } = await import(`../src/commands/${spec.mod}.mjs`);
     const client = spec.client ? new Client({ keyId: cfg.keyId, issuerId: cfg.issuerId }) : null;
-    const ok = await run(cfg, client);
+    // altool authenticates on its own rather than through our JWT, so it needs the raw ids.
+    const ok = await run(cfg, client, spec.credentials ? { keyId: cfg.keyId, issuerId: cfg.issuerId } : undefined);
     if (ok === false) process.exit(1);
   } else {
     console.error(usage());
@@ -87,7 +88,8 @@ usage: vydanne <command> [--config vydanne.config.mjs]
   inspect         read-only ASC state
   diff            show what differs between local (metadata/screenshots/previews) and ASC
   preflight       verify submission-completeness (the gotcha checker)
-  prerelease      --store google: upload the .aab to a closed testing track (refuses production)
+  prerelease      upload the build for testers — .ipa to TestFlight (internal groups only),
+                  or --store google: the .aab to a closed track. Refuses production/review.
   locales         UI -> ASC locale mapping + unsupported
   auth            which credentials resolved, and from where (masked) — run this on a 401
 credentials: env > .env cascade (.env, .env.<mode>, .env.local, .env.<mode>.local) > user config

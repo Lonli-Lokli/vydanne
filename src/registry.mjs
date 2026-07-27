@@ -14,6 +14,9 @@ export const COMMANDS = {
   inspect: { mod: "inspect", client: true },
   diff: { mod: "diff", client: true },
   preflight: { mod: "preflight", client: true },
+  // Uploads the .ipa to TestFlight. Needs the credentials as well as the client: the REST API
+  // cannot carry a binary, so this one shells out to `xcrun altool`, which authenticates itself.
+  prerelease: { mod: "prerelease", client: true, credentials: true },
 };
 
 // Commands available for `--store google` (Google Play). Same names as the Apple ones, different backend
@@ -27,4 +30,4 @@ export const PLAY_COMMANDS = {
 };
 
 // Full public command surface (the module-dispatched ones above + the three handled inline in bin/).
-export const COMMAND_NAMES = [...Object.keys(COMMANDS), "prerelease", "auth", "locales", "version"];
+export const COMMAND_NAMES = [...Object.keys(COMMANDS), "auth", "locales", "version"];

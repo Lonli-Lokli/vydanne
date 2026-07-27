@@ -16,7 +16,10 @@ export type CommandName =
   | 'inspect'
   | 'diff'
   | 'preflight'
-  /** Google Play only: upload an .aab to a closed testing track. Refuses `production`. */
+  /**
+   * Upload the build for testers: an .ipa to TestFlight (internal groups only), or with
+   * `--store google` an .aab to a closed track. Refuses App Store review and `production`.
+   */
   | 'prerelease'
   | 'auth'
   | 'locales'
@@ -50,6 +53,38 @@ export interface PrivacyConfig {
   /** ASC data-type ids, e.g. ['CRASH_DATA', 'PERFORMANCE_DATA']. */
   collected: string[];
   tracking: boolean;
+}
+
+/**
+ * Accessibility Nutrition Labels — CLAIMS about your app's behaviour, published to Apple.
+ *
+ * Every feature is stated explicitly and none is optional: an omission would read as a quiet
+ * "no", which is exactly as unverified as a quiet "yes". A missing block is an error rather than
+ * a default, because "nobody wrote this down" must never become "supports everything".
+ *
+ * Apple's platform caveats are applied for you — Larger Text does not exist on macOS, Voice
+ * Control does not exist on watchOS — so those are sent as false whatever you declare.
+ */
+export interface AccessibilityConfig {
+  voiceover: boolean;
+  voiceControl: boolean;
+  largerText: boolean;
+  sufficientContrast: boolean;
+  darkInterface: boolean;
+  differentiateWithoutColorAlone: boolean;
+  reducedMotion: boolean;
+  captions: boolean;
+  audioDescriptions: boolean;
+}
+
+export interface IosConfig {
+  /** `.ipa` for `prerelease` — a file, or a directory whose NEWEST .ipa is taken. Override: VYDANNE_IPA. */
+  ipa?: string;
+  /**
+   * INTERNAL TestFlight group to add the uploaded build to. External groups are refused:
+   * distributing to them requires Beta App Review, which is a submission by another name.
+   */
+  testFlightGroup?: string;
 }
 
 export interface GoogleConfig {
@@ -98,6 +133,10 @@ export interface VydanneConfig {
   iaps?: IapConfig[];
   previews?: PreviewSpec[];
   export?: ExportConfig;
+  /** What the app actually supports, for the Accessibility Nutrition Labels. Required by that command. */
+  accessibility?: AccessibilityConfig;
+  /** iOS build upload (`prerelease`): where the .ipa is, and which internal TestFlight group. */
+  ios?: IosConfig;
   /** Google Play (`--store google`): listings, screenshots, feature graphic via the Edits API. */
   google?: GoogleConfig;
 }

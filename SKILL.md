@@ -170,6 +170,9 @@ which also makes it macOS-only. `.ipa` comes from `ios.ipa` / `VYDANNE_IPA` (a d
 newest), the build number from the archive's own `CFBundleVersion`, and `ios.testFlightGroup` may add
 it to an **internal** group. External groups are REFUSED — they need Beta App Review, a submission by
 another name — and App Store review is never submitted, mirroring the Play side refusing `production`.
+It then points the version being prepared AT that build, so the fix-and-re-upload loop is one command:
+re-running re-points (the relationship holds one build), while a version that is `IN_REVIEW` or
+`READY_FOR_SALE` is left alone, since re-pointing it would mean withdrawing a submission.
 
 With `--store google` it uploads an `.aab` to a **closed testing track** with release notes, inside one
 edit transaction. `production` is REFUSED — not flag-gated — so no argument combination ships to the

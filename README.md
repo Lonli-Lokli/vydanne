@@ -223,6 +223,20 @@ entitlements, missing icons, a version Apple already holds) cost seconds rather 
 Build numbers come from the archive's own `CFBundleVersion` — re-uploading one Apple already holds
 fails loudly instead of quietly replacing a binary.
 
+It also **points the version you are preparing at the build it just uploaded**, which is the loop
+this command exists for:
+
+```sh
+npx vydanne prerelease      # version 1.1 -> build 66, off to testers
+# …find something, fix it, re-archive with a new build number…
+npx vydanne prerelease      # version 1.1: build 66 -> build 67
+```
+
+The version→build relationship holds exactly one build, so re-running re-points it and there is
+nothing to clean up. A version that is no longer editable — `IN_REVIEW`, `READY_FOR_SALE` — is left
+alone and said so, because re-pointing it would mean withdrawing that submission, and that is a
+decision with reviewer-facing consequences.
+
 **External TestFlight groups are refused.** Distributing to them requires Beta App Review, which is a
 submission by another name; internal groups are the exact parallel of Play's `internal` track, and on
 a paid app they are the testers who install without buying it.

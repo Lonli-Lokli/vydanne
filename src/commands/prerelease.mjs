@@ -1,5 +1,4 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -32,6 +31,16 @@ const run_ = promisify(execFile);
  * Apple assigns nothing: the build number comes from the archive's own CFBundleVersion, so build
  * numbering stays with the build, and re-uploading one Apple already holds fails loudly instead of
  * silently replacing a binary.
+ *
+ * WHAT IT ALSO DOES: points the version you are preparing AT the build it just uploaded. That is
+ * the loop this command exists to serve — ship a build to testers, find something, fix it, upload
+ * again — and without it the version keeps whatever build was attached first while TestFlight
+ * quietly moves on. Re-running simply re-points: the relationship is a single build, so the newest
+ * upload replaces the old one and there is nothing to clean up.
+ *
+ * It will not re-point a version that is no longer editable (in review, or already released),
+ * because Apple would need that version withdrawn first — a decision with reviewer-facing
+ * consequences, and therefore the operator's.
  */
 
 /** How long to watch processing before handing back. Apple is usually minutes, occasionally not. */
@@ -135,6 +144,8 @@ export async function run(config, client, credentials) {
     await assignToInternalGroup(client, build, ios.testFlightGroup);
   }
 
+  await pointVersionAtBuild(client, config, build);
+
   console.log("prerelease done — the build is in TestFlight.");
   console.log(yellow("  Submitting for App Store review stays manual, by design."));
   return true;
@@ -186,6 +197,58 @@ async function assignToInternalGroup(client, build, groupName) {
   });
   if (r.status < 300) console.log(green(`  added to internal group "${groupName}"`));
   else console.error(yellow(`  could not add to "${groupName}" (${r.status})`));
+}
+
+/** Versions Apple will not let us re-point without the operator withdrawing them first. */
+const LOCKED_STATES = new Set([
+  "WAITING_FOR_REVIEW",
+  "IN_REVIEW",
+  "PENDING_DEVELOPER_RELEASE",
+  "PENDING_APPLE_RELEASE",
+  "READY_FOR_SALE",
+  "REPLACED_WITH_NEW_VERSION",
+]);
+
+/**
+ * Attach [build] to the version being prepared, replacing whatever was there.
+ *
+ * This is what makes "upload a fix and try again" one command rather than a trip to the web UI:
+ * the version → build relationship holds exactly one build, so a PATCH re-points it.
+ */
+export async function pointVersionAtBuild(client, config, build) {
+  const platform = (config.platforms && config.platforms[0]) || "IOS";
+  const version = await client.editVersion(platform);
+  if (!version) {
+    console.log(yellow("  no editable App Store version — build uploaded, nothing to attach it to."));
+    return;
+  }
+  const state = version.attributes.appStoreState;
+  const versionString = version.attributes.versionString;
+  if (LOCKED_STATES.has(state)) {
+    console.log(yellow(`  version ${versionString} is ${state} — leaving its build alone.`));
+    console.log("  Re-pointing it would mean withdrawing that submission, which is your call.");
+    return;
+  }
+
+  // What it currently points at, so a no-op re-run says so rather than looking like a change.
+  const { json: current } = await client.get(
+    `/v1/appStoreVersions/${version.id}/build?fields[builds]=version`,
+  );
+  const was = current.data?.attributes?.version ?? current.data?.id ?? null;
+  if (current.data?.id === build.id) {
+    console.log(green(`  version ${versionString} already points at build ${build.attributes.version}`));
+    return;
+  }
+
+  const r = await client.patch(`/v1/appStoreVersions/${version.id}/relationships/build`, {
+    data: { type: "builds", id: build.id },
+  });
+  if (r.status < 300) {
+    const from = was ? `build ${was} -> ` : "";
+    console.log(green(`  version ${versionString}: ${from}build ${build.attributes.version}`));
+  } else {
+    console.error(yellow(`  could not attach the build to version ${versionString} (${r.status})`));
+  }
 }
 
 const indent = (text) =>

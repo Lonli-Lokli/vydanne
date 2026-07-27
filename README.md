@@ -1,5 +1,10 @@
 # vydanne
 
+[![npm version](https://img.shields.io/npm/v/vydanne.svg)](https://www.npmjs.com/package/vydanne)
+[![npm downloads](https://img.shields.io/npm/dm/vydanne.svg)](https://www.npmjs.com/package/vydanne)
+[![node](https://img.shields.io/node/v/vydanne.svg)](https://nodejs.org)
+[![license](https://img.shields.io/npm/l/vydanne.svg)](LICENSE)
+
 **Fill in your app's App Store and Google Play listing — in every language — from files on your computer.**
 
 Publishing an app means typing the same things into a web form over and over: a name, a subtitle, a
@@ -29,7 +34,7 @@ actual app. vydanne handles the *listing*, not the software.
 
 ## The two halves of a release
 
-vydanne has a sibling — **[zdymak](https://www.npmjs.com/package/zdymak)**. They split the job cleanly:
+vydanne has a sibling — **[zdymak](https://github.com/Lonli-Lokli/zdymak)**. They split the job cleanly:
 
 | | [zdymak](https://github.com/Lonli-Lokli/zdymak) 📸 | **vydanne** 📝 |
 |---|---|---|

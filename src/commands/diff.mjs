@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { green, yellow, red } from "../util.mjs";
 import { VALID } from "../locales.mjs";
+import { md5 } from "../upload.mjs";
 import { localScreenshots, remoteScreenshots, compareShots } from "../screenshots.mjs";
 
 // [asc attribute, local metadata filename, isLongText]
@@ -111,12 +112,33 @@ async function mediaDiff(config, client, platform, verLocs) {
       console.log(`${label}: ${c.names.length} present, checksum not reported by Apple — content unverified`);
     }
   }
+  // Previews by content too — the count comparison this replaces had the screenshot bug in miniature:
+  // one-local-vs-one-remote reads "in sync" however different the videos are, so a re-rendered App
+  // Preview reported nothing to do. `uploadAsset` commits md5(bytes) as sourceFileChecksum for
+  // previews exactly as it does for screenshots, so the same comparison is available for free.
   const { json: psets } = await client.get(`/v1/appStoreVersionLocalizations/${primary.id}/appPreviewSets?include=appPreviews&limit=50`);
+  const prevById = new Map((psets.included || []).filter((r) => r.type === "appPreviews").map((r) => [r.id, r.attributes || {}]));
   const remotePrev = {};
-  for (const s of psets.data || []) remotePrev[s.attributes.previewType] = (s.relationships?.appPreviews?.data || []).length;
+  for (const s of psets.data || []) {
+    remotePrev[s.attributes.previewType] = (s.relationships?.appPreviews?.data || [])
+      .map((ref) => prevById.get(ref.id)?.sourceFileChecksum ?? null);
+  }
   for (const spec of (config.previews || []).filter((s) => s.platform === platform && (s.locales || []).includes(config.primaryLocale))) {
-    const L = fs.existsSync(path.resolve(spec.file)) ? 1 : 0, R = remotePrev[spec.type] || 0;
-    if (L !== R) { diffs++; console.log(`  ${yellow("preview")} ${spec.type}: local ${L} / remote ${R}  (@${config.primaryLocale})`); }
+    const file = path.resolve(spec.file);
+    const L = fs.existsSync(file) ? 1 : 0;
+    const R = remotePrev[spec.type] || [];
+    const label = `  ${yellow("preview")} ${spec.type}`;
+    if (L !== R.length) {
+      diffs++;
+      console.log(`${label}: local ${L} / remote ${R.length}  (@${config.primaryLocale})`);
+    } else if (L === 1) {
+      if (R.every((sum) => sum === null)) {
+        console.log(`${label}: present, checksum not reported by Apple — content unverified`);
+      } else if (!R.includes(md5(fs.readFileSync(file)))) {
+        diffs++;
+        console.log(`${label}: differs in content (${path.basename(spec.file)})  (@${config.primaryLocale})`);
+      }
+    }
   }
   return diffs;
 }

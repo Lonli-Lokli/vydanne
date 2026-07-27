@@ -7,7 +7,9 @@ const FIELDS = [["title", "title"], ["shortDescription", "short_description"], [
 // Play image type -> local source (a dir of PNGs = screenshots; a single file = graphic). From zdymak.
 // Each type is uploaded only when its local asset EXISTS, so an app that lacks (say) tablet shots or a
 // znachok icon simply skips that type — a missing local set never deletes the live one.
-const IMAGES = [
+// Exported because `diff` compares the same types from the same paths — a second copy of this table
+// would let the two disagree about which files are even part of the listing.
+export const IMAGES = [
   ["icon", "brand/icons/play/icon-512.png", "file"],
   ["featureGraphic", "marketing/out/play-feature-graphic.png", "file"],
   ["phoneScreenshots", "marketing/out/play-phone-plain", "dir"],

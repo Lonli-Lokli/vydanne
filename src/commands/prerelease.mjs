@@ -110,6 +110,14 @@ export async function run(config, client, credentials) {
     return false;
   }
 
+  // The binary upload is the one mutation that does NOT go through the ASC client, so the client-level
+  // dry-run gate cannot see it — it has to be refused here, or a dry run would ship a build to TestFlight.
+  // Validation above has already run, which is the useful half: exactly Play's "validate, then discard".
+  if (client.dryRun) {
+    console.log(yellow("  DRY RUN — archive validated, NOT uploaded. Re-run with --apply to send it to TestFlight."));
+    return true;
+  }
+
   try {
     await altool(["--upload-app", "-f", ipa, "-t", "ios"], credentials);
     console.log(green("  uploaded"));

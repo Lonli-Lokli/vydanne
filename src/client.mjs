@@ -1,4 +1,5 @@
 import { makeToken } from "./jwt.mjs";
+import { yellow } from "./util.mjs";
 
 const API = "https://api.appstoreconnect.apple.com";
 const IRIS = "https://appstoreconnect.apple.com/iris";
@@ -10,15 +11,24 @@ const DEAD_VERSION = ["READY_FOR_SALE", "REMOVED_FROM_SALE", "REPLACED_WITH_NEW_
 // release notes included, on any app that already has a version on sale.
 const DEAD_INFO = ["READY_FOR_SALE", "READY_FOR_DISTRIBUTION", "REPLACED_WITH_NEW_VERSION", "REMOVED_FROM_SALE"];
 
+// Anything that is not a read. ASC has no transaction to roll back — unlike Play, where an edit can be
+// discarded — so for Apple the only safe place to stand between a command and a live listing is here.
+const MUTATING = new Set(["POST", "PATCH", "PUT", "DELETE"]);
+
 // Thin ASC REST client. Encodes the gotchas: `iris` host (App Privacy 401s the JWT), version + app-info
 // fetched from the FULL list (get_edit filters out READY_FOR_REVIEW), and individual localization reads
 // (list endpoints return sparse/empty text).
 export class Client {
-  constructor({ keyId, issuerId }) {
+  constructor({ keyId, issuerId, dryRun = false }) {
     this.token = makeToken({ keyId, issuerId });
+    /** No mutating request leaves this process. Set by bin/ for a write command without `--apply`. */
+    this.dryRun = dryRun;
+    /** What a real run WOULD have sent, in order — the dry-run report, and the count bin/ prints. */
+    this.planned = [];
   }
 
   async req(method, urlPath, { iris = false, body, rawHeaders, rawBody } = {}) {
+    if (this.dryRun && MUTATING.has(method)) return this.#plan(method, urlPath, body);
     const headers = { Authorization: `Bearer ${this.token}` };
     if (body) headers["Content-Type"] = "application/json";
     Object.assign(headers, rawHeaders || {});
@@ -29,6 +39,31 @@ export class Client {
     let json;
     try { json = text ? JSON.parse(text) : {}; } catch { json = text; }
     return { status: res.status, json, text };
+  }
+
+  /**
+   * Record a mutation instead of sending it, and hand back a response shaped like the one Apple would
+   * have returned.
+   *
+   * The shape matters as much as the refusal. A dry run that returned `null` here would crash the first
+   * caller that reads `.json.data.id` — and the operator would see one locale out of twenty, which is
+   * exactly the report they cannot act on. So a synthesised `data` carries the id the caller needs to
+   * keep going, and the run walks the WHOLE plan: every locale, every screenshot set, every field.
+   *
+   * The id is deliberately `dry-run-<n>` rather than a plausible-looking one — if it ever escapes into a
+   * URL, the request 404s loudly instead of touching some real record.
+   */
+  #plan(method, urlPath, body) {
+    const attributes = body?.data?.attributes || {};
+    const fields = Object.keys(attributes);
+    this.planned.push({ method, path: urlPath, attributes });
+    console.log(yellow(`      would ${method} ${urlPath}${fields.length ? ` — ${fields.join(", ")}` : ""}`));
+    return {
+      status: method === "DELETE" ? 204 : 200,
+      json: { data: { id: body?.data?.id || `dry-run-${this.planned.length}`, type: body?.data?.type, attributes } },
+      text: "",
+      dryRun: true,
+    };
   }
 
   get(p, opts) { return this.req("GET", p, opts); }

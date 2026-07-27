@@ -1,4 +1,5 @@
 import { green, red, yellow } from "../../util.mjs";
+import { reportCrossStore } from "../../crossStore.mjs";
 
 // Play listing limits.
 const LIMITS = { title: 30, shortDescription: 80, fullDescription: 4000 };
@@ -30,6 +31,10 @@ export async function run(config, client) {
   } finally {
     await client.deleteEdit(editId);
   }
+  if (!reportCrossStore("google", g.metadataDir, config.allowCrossStoreTerms)) {
+    problems.push("listing text references another app store (see above)");
+  }
+
   console.log();
   if (!problems.length) console.log(green("preflight: no blockers"));
   else { console.log(red(`preflight: ${problems.length} blocker(s)`)); problems.forEach((p) => console.log(`  ${red("x")} ${p}`)); }

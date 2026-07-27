@@ -79,9 +79,9 @@ export async function run(config, client) {
     const put = await client.putTrack(editId, track, [release]);
     if (put.status >= 300) throw new Error(`tracks.update ${put.status}: ${JSON.stringify(put.json).slice(0, 300)}`);
 
-    if (process.env.VYDANNE_COMMIT !== "1") {
+    if (client.dryRun) {
       await client.deleteEdit(editId);
-      console.log(yellow(`\n  DRY RUN — edit discarded, nothing changed. Re-run with VYDANNE_COMMIT=1 to publish to "${track}".`));
+      console.log(yellow(`\n  DRY RUN — edit discarded, nothing changed. Re-run with --apply to publish to "${track}".`));
       return true;
     }
     const res = await client.commit(editId);

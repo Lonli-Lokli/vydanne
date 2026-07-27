@@ -3,6 +3,7 @@ import path from "node:path";
 import { green, yellow, red } from "../util.mjs";
 import { VALID } from "../locales.mjs";
 import { uploadAsset } from "../upload.mjs";
+import { reportCrossStore } from "../crossStore.mjs";
 
 // Version-localization fields (attr -> metadata filename) and AppInfo fields (name/subtitle, shared).
 const VERSION_TXT = { description: "description", keywords: "keywords", promotionalText: "promotional_text", whatsNew: "release_notes", marketingUrl: "marketing_url", supportUrl: "support_url" };
@@ -50,6 +51,16 @@ export async function run(config, client) {
   let ok = true; // a locale Apple refused must fail the command, not just print
   const skipMeta = process.env.VYDANNE_SKIP_METADATA === "1";
   const skipShots = process.env.VYDANNE_SKIP_SCREENSHOTS === "1";
+
+  // Checked here and not only in preflight, because preflight is something you REMEMBER to run and
+  // this is the thing that actually uploads. A cross-store reference costs a review cycle, and it
+  // is free to catch one function call earlier. VYDANNE_ALLOW_CROSS_STORE=1 is the deliberate
+  // override for the rare listing that genuinely needs the word.
+  if (!skipMeta && process.env.VYDANNE_ALLOW_CROSS_STORE !== "1"
+      && !reportCrossStore("apple", config.metadataDir, config.allowCrossStoreTerms)) {
+    console.error(red("fill: refusing to upload — fix the listing text, or set VYDANNE_ALLOW_CROSS_STORE=1."));
+    return false;
+  }
   const info = await client.appInfo();
   const infoLocs = info ? (await client.get(`/v1/appInfos/${info.id}/appInfoLocalizations?limit=200`)).json.data || [] : [];
 

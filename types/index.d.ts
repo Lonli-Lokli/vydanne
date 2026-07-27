@@ -139,18 +139,32 @@ export interface VydanneConfig {
   ios?: IosConfig;
   /** Google Play (`--store google`): listings, screenshots, feature graphic via the Edits API. */
   google?: GoogleConfig;
+  /**
+   * Terms the cross-store check must not flag for this app.
+   *
+   * `preflight` and `fill` refuse listing text that names the OTHER mobile platform — App Review
+   * guideline 2.3.10 and Google Play's Store Listing and Promotion policy both reject it. Use this
+   * only for a word that genuinely belongs in your copy (a game about fruit really does say
+   * "apple"); it is not a way to ship a store name.
+   */
+  allowCrossStoreTerms?: string[];
 }
 
 /** Thin ASC REST client (native fetch + ES256 JWT). */
 export declare class Client {
-  constructor(opts: { keyId: string; issuerId: string });
+  constructor(opts: { keyId: string; issuerId: string; dryRun?: boolean });
   token: string;
   appId?: string;
   app?: unknown;
+  /** When true, no POST/PATCH/PUT/DELETE leaves the process — each is recorded in `planned` instead. */
+  dryRun: boolean;
+  /** The mutations a real run would have sent, in order. Populated only while `dryRun`. */
+  planned: Array<{ method: string; path: string; attributes: Record<string, unknown> }>;
   findApp(bundleId: string): Promise<unknown>;
   get(path: string, opts?: { iris?: boolean }): Promise<{ status: number; json: any }>;
   post(path: string, body: unknown): Promise<{ status: number; json: any }>;
   patch(path: string, body: unknown): Promise<{ status: number; json: any }>;
+  del(path: string): Promise<{ status: number; json: any }>;
   editVersion(platform: Platform): Promise<any>;
   appInfo(): Promise<any>;
   versionLocalizations(versionId: string): Promise<any[]>;
@@ -164,6 +178,7 @@ export declare function toAsc(code: string): string | null;
 export declare const VALID: Set<string>;
 export declare const CONFIG_KEYS: readonly string[];
 export declare const COMMAND_NAMES: readonly CommandName[];
-export declare const COMMANDS: Record<string, { mod: string; client: boolean }>;
+/** `writes` marks a command that mutates the STORE — those are dry-run unless the CLI gets `--apply`. */
+export declare const COMMANDS: Record<string, { mod: string; client: boolean; writes?: boolean }>;
 
 export default VydanneConfig;

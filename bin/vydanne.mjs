@@ -5,6 +5,7 @@ import path from "node:path";
 import { loadConfig } from "../src/config.mjs";
 import { Client } from "../src/client.mjs";
 import { COMMANDS, PLAY_COMMANDS } from "../src/registry.mjs";
+import { yellow } from "../src/util.mjs";
 
 const VERSION = JSON.parse(readFileSync(new URL("../package.json", import.meta.url))).version;
 
@@ -14,6 +15,15 @@ const i = argv.indexOf("--config");
 const cfgPath = i >= 0 ? argv[i + 1] : undefined;
 const si = argv.indexOf("--store");
 const store = si >= 0 ? argv[si + 1] : "apple";
+
+// SAFE BY DEFAULT. Every store-mutating command is a dry run unless `--apply` is passed. The Play half
+// always worked this way (VYDANNE_COMMIT=1, enforceable because an Edit can be discarded); the Apple half
+// did not, and wrote the moment it was invoked — including from a mistyped `vydanne fill --help`, which
+// is not a hypothetical. One flag now means the same thing on both stores.
+//
+// VYDANNE_COMMIT=1 stays as an alias so the existing `play:internal` / `play:closed` scripts in the games
+// keep working unchanged; `--apply` is what the docs teach.
+const apply = argv.includes("--apply") || process.env.VYDANNE_COMMIT === "1";
 
 try {
   if (["version", "-v", "--version"].includes(cmd)) {
@@ -53,17 +63,32 @@ try {
     if (!PLAY_COMMANDS[cmd]) throw new Error(`vydanne: '${cmd}' isn't available for --store google (try: ${Object.keys(PLAY_COMMANDS).join(", ")})`);
     if (!cfg.google.serviceAccountKey) throw new Error("vydanne: set PLAY_JSON_KEY_FILE (or google.serviceAccountKey) to the Play service-account JSON");
     const { PlayClient } = await import("../src/play/client.mjs");
-    const client = await PlayClient.create({ keyPath: cfg.google.serviceAccountKey, packageName: cfg.google.packageName });
-    const { run } = await import(`../src/play/commands/${PLAY_COMMANDS[cmd].mod}.mjs`);
+    const spec = PLAY_COMMANDS[cmd];
+    const dryRun = Boolean(spec.writes) && !apply;
+    // Play needs no request-level gate: every mutation happens inside an Edit, and an Edit that is never
+    // committed changes nothing. So a dry run here VALIDATES for real against Google, then discards.
+    const client = await PlayClient.create({ keyPath: cfg.google.serviceAccountKey, packageName: cfg.google.packageName, dryRun });
+    if (dryRun) console.log(yellow(`DRY RUN — '${cmd} --store google' validates against Play and discards the edit. Add --apply to commit.`));
+    const { run } = await import(`../src/play/commands/${spec.mod}.mjs`);
     const ok = await run(cfg, client);
     if (ok === false) process.exit(1);
   } else if (COMMANDS[cmd]) {
     const cfg = await loadConfig(cfgPath);
     const spec = COMMANDS[cmd];
     const { run } = await import(`../src/commands/${spec.mod}.mjs`);
-    const client = spec.client ? new Client({ keyId: cfg.keyId, issuerId: cfg.issuerId }) : null;
+    const dryRun = Boolean(spec.writes) && !apply;
+    const client = spec.client ? new Client({ keyId: cfg.keyId, issuerId: cfg.issuerId, dryRun }) : null;
+    if (dryRun) console.log(yellow(`DRY RUN — '${cmd}' will not change App Store Connect. Add --apply to write.`));
     // altool authenticates on its own rather than through our JWT, so it needs the raw ids.
     const ok = await run(cfg, client, spec.credentials ? { keyId: cfg.keyId, issuerId: cfg.issuerId } : undefined);
+    // The count is the point: "nothing happened" is not the same as "nothing would happen", and only the
+    // second one means the local state already matches the store.
+    if (dryRun && client) {
+      const n = client.planned.length;
+      console.log(yellow(n
+        ? `DRY RUN — ${n} store write(s) withheld. Re-run with --apply to perform them.`
+        : "DRY RUN — nothing to write; the store already matches local."));
+    }
     if (ok === false) process.exit(1);
   } else {
     console.error(usage());
@@ -77,19 +102,23 @@ try {
 function usage() {
   return `vydanne ${VERSION} — App Store Connect + Play prep (companion to zdymak). Ships builds to
 testers; never submits for review.
-usage: vydanne <command> [--config vydanne.config.mjs]
-  fill            metadata + screenshots + previews (native; iOS & macOS separate)
-  age-rating      set the age rating (AppInfo declaration)
-  review-contact  App Review contact from the gitignored files
-  accessibility   Accessibility Nutrition Labels (draft; VYDANNE_A11Y_PUBLISH=1 to publish once live)
+usage: vydanne <command> [--apply] [--config vydanne.config.mjs]
+
+  --apply         PERFORM the writes. Without it every store-mutating command below (marked ✎) runs
+                  as a DRY RUN: it reads the store, reports exactly what it would change, and sends
+                  nothing. Read-only commands ignore the flag.
+✎ fill            metadata + screenshots + previews (native; iOS & macOS separate)
+✎ age-rating      set the age rating (AppInfo declaration)
+✎ review-contact  App Review contact from the gitignored files
+✎ accessibility   Accessibility Nutrition Labels (draft; VYDANNE_A11Y_PUBLISH=1 to publish once live)
   privacy         write the record + print the ASC-UI answers (API can't reach iris)
-  previews        upload App Preview videos (native chunked upload)
+✎ previews        upload App Preview videos (native chunked upload)
   iap             validate IAP fields; VYDANNE_FLATTEN=<png> flattens a screenshot to RGB
   compliance      generate the US encryption self-classification PDF
   inspect         read-only ASC state
   diff            show what differs between local (metadata/screenshots/previews) and ASC
   preflight       verify submission-completeness (the gotcha checker)
-  prerelease      upload the build for testers — .ipa to TestFlight (internal groups only),
+✎ prerelease      upload the build for testers — .ipa to TestFlight (internal groups only),
                   or --store google: the .aab to a closed track. Refuses production/review.
   locales         UI -> ASC locale mapping + unsupported
   auth            which credentials resolved, and from where (masked) — run this on a 401
@@ -97,5 +126,6 @@ credentials: env > .env cascade (.env, .env.<mode>, .env.local, .env.<mode>.loca
   (\$VYDANNE_CONFIG_HOME, %APPDATA%\\vydanne or \$XDG_CONFIG_HOME/vydanne, ~/.appstoreconnect).
   NEVER the committed vydanne.config.mjs — run \`vydanne auth\` to see what resolved.
 toggles: VYDANNE_SKIP_METADATA / VYDANNE_SKIP_SCREENSHOTS (fill), VYDANNE_A11Y_PUBLISH (accessibility),
-         VYDANNE_PROFILE (named profile), VYDANNE_ENV (.env mode)`;
+         VYDANNE_PROFILE (named profile), VYDANNE_ENV (.env mode),
+         VYDANNE_COMMIT=1 (legacy alias for --apply — prefer the flag)`;
 }

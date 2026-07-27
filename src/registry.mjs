@@ -1,14 +1,21 @@
 // The canonical command registry — the single source of vydanne's public commands. bin/ dispatches from
 // this, and the drift guards (scripts/check-docs.mjs, scripts/check-types.mjs) assert every command is
 // documented in README/SKILL and typed in types/index.d.ts. Add a command here → the guards force it into
-// the docs + types before publish.  name -> { mod: <file in src/commands>, client: needs an ASC client }
+// the docs + types before publish.
+//
+//   name -> { mod: <file in src/commands>, client: needs an ASC client, writes: mutates the STORE }
+//
+// `writes` is what makes a command dry-run unless `--apply` is passed, so it is a safety declaration, not
+// a label: mark a new command `writes: true` the moment it can change anything on the store side. It means
+// the STORE specifically — `privacy` and `compliance` write local files (a record, a PDF) and are not
+// marked, because a dry run that refused to produce a local artefact would just be broken.
 export const COMMANDS = {
-  fill: { mod: "fill", client: true },
-  "age-rating": { mod: "ageRating", client: true },
-  "review-contact": { mod: "reviewContact", client: true },
-  accessibility: { mod: "accessibility", client: true },
+  fill: { mod: "fill", client: true, writes: true },
+  "age-rating": { mod: "ageRating", client: true, writes: true },
+  "review-contact": { mod: "reviewContact", client: true, writes: true },
+  accessibility: { mod: "accessibility", client: true, writes: true },
   privacy: { mod: "privacy", client: false },
-  previews: { mod: "previews", client: true },
+  previews: { mod: "previews", client: true, writes: true },
   iap: { mod: "iap", client: false },
   compliance: { mod: "compliance", client: false },
   inspect: { mod: "inspect", client: true },
@@ -16,7 +23,7 @@ export const COMMANDS = {
   preflight: { mod: "preflight", client: true },
   // Uploads the .ipa to TestFlight. Needs the credentials as well as the client: the REST API
   // cannot carry a binary, so this one shells out to `xcrun altool`, which authenticates itself.
-  prerelease: { mod: "prerelease", client: true, credentials: true },
+  prerelease: { mod: "prerelease", client: true, credentials: true, writes: true },
 };
 
 // Commands available for `--store google` (Google Play). Same names as the Apple ones, different backend
@@ -25,8 +32,8 @@ export const PLAY_COMMANDS = {
   inspect: { mod: "inspect" },
   preflight: { mod: "preflight" },
   diff: { mod: "diff" },
-  fill: { mod: "fill" },
-  prerelease: { mod: "prerelease" },
+  fill: { mod: "fill", writes: true },
+  prerelease: { mod: "prerelease", writes: true },
 };
 
 // Full public command surface (the module-dispatched ones above + the three handled inline in bin/).

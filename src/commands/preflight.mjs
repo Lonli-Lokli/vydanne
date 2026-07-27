@@ -1,4 +1,5 @@
 import { green, red, yellow, LIMITS, VERSION_FIELDS } from "../util.mjs";
+import { reportCrossStore } from "../crossStore.mjs";
 
 // Verify a listing is submission-complete the CORRECT way — each localization read by id (not the sparse
 // list), char limits, primary-locale coverage, per-platform — and warn on the gotchas before ASC does.
@@ -32,6 +33,11 @@ export async function run(config, client) {
       const count = (json.data || []).reduce((n, s) => n + (s.relationships?.appScreenshots?.data || []).length, 0);
       if (!count) problems.push(`${platform}/${config.primaryLocale}: no screenshots`);
     }
+  }
+
+  // Local copy that is about to be uploaded, checked before it can earn a rejection.
+  if (!reportCrossStore("apple", config.metadataDir, config.allowCrossStoreTerms)) {
+    problems.push("listing text references another mobile platform (see above)");
   }
 
   console.log();

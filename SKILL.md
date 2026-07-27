@@ -166,7 +166,15 @@ who it's for → honest close. Keep it scannable; lead each bullet with the payo
 `previews` (App Preview videos) · `age-rating` · `review-contact` · `accessibility` (draft; publish once
 live) · `privacy` (prints answers for the UI — the API can't reach Apple's iris host) · `iap` (validate +
 RGB flatten) · `compliance` (US self-classification PDF) · `diff` (what differs vs live) · `preflight`
-(completeness gate) · `inspect` · `auth` (what credentials resolved, and from where) · `locales` · `version`.
+(completeness gate + cross-store lint) · `inspect` · `auth` (what credentials resolved, and from where) · `locales` · `version`.
+
+**Cross-store lint.** `preflight` and `fill` refuse listing text that names the other mobile platform
+— App Review 2.3.10 for Apple, the Store Listing and Promotion policy for Google — scanning every
+locale and field of the LOCAL metadata before upload, including localized spellings of Android/Apple.
+A store's own platform is never flagged, nor the bare word "Play". Ambiguous words warn instead of
+blocking; `allowCrossStoreTerms: [...]` in the config silences a specific one, and
+`VYDANNE_ALLOW_CROSS_STORE=1` overrides a single run. This is a rejection that surfaces days later in
+one locale out of twenty, so it is checked where it is free to fix.
 
 `prerelease` uploads the BUILD. On Apple it validates and uploads the `.ipa` to **TestFlight** via
 `xcrun altool` — the one command that shells out, because the ASC REST API has never carried a binary,
@@ -185,23 +193,38 @@ comes from `google.track` / `VYDANNE_TRACK`, default `internal`; the bundle from
 `VYDANNE_AAB` (a directory takes its newest `.aab`). **For a PAID app use `internal`** — it's the only
 track where testers install without buying. Notes follow supply's layout:
 `<google.metadataDir>/<play-locale>/changelogs/<versionCode>.txt`, falling back to `default.txt`, capped
-at Play's 500 chars. DRY by default like `fill --store google`; `VYDANNE_COMMIT=1` publishes. The
-versionCode comes from the bundle itself, so re-uploading one fails loudly instead of silently replacing.
+at Play's 500 chars. DRY by default; `--apply` publishes. The versionCode comes from the bundle itself,
+so re-uploading one fails loudly instead of silently replacing.
 
 `--store google` routes `inspect` · `diff` · `preflight` · `fill` · `prerelease` to the Play Developer **Edits** API
 (OAuth2 service account; **scoped to the config's `packageName`** — a shared key can't touch another app).
-`fill --store google` is **DRY by default**; `VYDANNE_COMMIT=1` commits. The AAB binary and the
-(YouTube-URL) promo video stay outside vydanne.
+The AAB binary and the (YouTube-URL) promo video stay outside vydanne.
+
+## `--apply` — writes are opt-in
+
+**Every store-mutating command is a DRY RUN without `--apply`**: `fill` · `previews` · `age-rating` ·
+`review-contact` · `accessibility` · `prerelease` (marked `✎` in `vydanne help`). They read the store,
+print each write they would make, and send nothing. Read-only commands ignore the flag.
+
+Never reach for `--apply` to "check whether it works" — the dry run IS the check, and it walks the whole
+plan rather than stopping at the first locale. Its closing count is what you compare against `diff`.
+
+Enforcement differs per store, on purpose: **Play** builds the Edit and validates it against Google for
+real, then discards it (nothing is live until commit). **Apple** has no transaction, so the gate is at the
+HTTP layer in `src/client.mjs` — no `POST`/`PATCH`/`PUT`/`DELETE` leaves the process, and each is recorded
+in `client.planned`. `prerelease` needs its own guard because the `altool` binary upload does not go
+through that client. **A new command that touches the store must be marked `writes: true` in
+`src/registry.mjs`** — that flag is the whole opt-in, not a label.
 
 **Env toggles:** `VYDANNE_CONFIG` · `VYDANNE_SKIP_METADATA` / `VYDANNE_SKIP_SCREENSHOTS` (fill) ·
-`VYDANNE_COMMIT` (Play fill) · `VYDANNE_REPLACE` (previews) · `VYDANNE_FLATTEN=<png>` (iap) ·
-`VYDANNE_A11Y_PUBLISH` (accessibility).
+`VYDANNE_REPLACE` (previews) · `VYDANNE_FLATTEN=<png>` (iap) · `VYDANNE_A11Y_PUBLISH` (accessibility) ·
+`VYDANNE_COMMIT=1` (legacy alias for `--apply`; prefer the flag).
 
 ## Flow
 
 config → **write the English master listing (ASO, research-grounded)** → `preflight` (char limits) → fan
-out one copywriter agent per locale → media from zdymak → `fill` + `previews` + declarations → `diff`
-(dry-run) → `preflight` (must be green) → **a human submits**.
+out one copywriter agent per locale → media from zdymak → `fill` + `previews` + declarations (read the
+dry run, then re-run with `--apply`) → `diff` → `preflight` (must be green) → **a human submits**.
 
 ## Gotchas it encodes (don't re-derive)
 

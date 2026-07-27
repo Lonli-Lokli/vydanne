@@ -24,17 +24,24 @@ export async function run(config, client) {
         }
         for (const p of existing) { // VYDANNE_REPLACE: drop the old preview so the new upload takes its place
           await client.del(`/v1/appPreviews/${p.id}`);
-          console.log(yellow(`  ${s.platform}/${code}/${s.type}: removed old preview ${p.id}`));
+          console.log(yellow(`  ${s.platform}/${code}/${s.type}: ${client.dryRun ? "would remove" : "removed"} old preview ${p.id}`));
         }
         if (!set) {
           const c = await client.post(`/v1/appPreviewSets`, { data: { type: "appPreviewSets", attributes: { previewType: s.type }, relationships: { appStoreVersionLocalization: { data: { type: "appStoreVersionLocalizations", id: loc.id } } } } });
           set = c.json.data;
         }
         const file = path.resolve(s.file);
-        console.log(`  ${s.platform}/${code}/${s.type}: uploading ${path.basename(file)}...`);
+        // A configured preview whose file is missing is the whole reason this is checked here: the
+        // upload would throw ENOENT mid-run, and in a DRY run it would otherwise look like a plan that
+        // works. Name it and move on, so one missing video doesn't hide the rest of the report.
+        if (!fs.existsSync(file)) {
+          console.error(red(`  ${s.platform}/${code}/${s.type}: ${path.relative(process.cwd(), file)} does not exist — nothing to upload`));
+          continue;
+        }
+        console.log(`  ${s.platform}/${code}/${s.type}: ${client.dryRun ? "would upload" : "uploading"} ${path.basename(file)}...`);
         const id = await uploadAsset(client, { type: "appPreviews", setType: "appPreviewSet", setId: set.id, filePath: file });
         await setPreviewPoster(client, id, s.poster);
-        console.log(green(`    done ${s.platform}/${code}/${s.type}`));
+        if (!client.dryRun) console.log(green(`    done ${s.platform}/${code}/${s.type}`));
       } catch (e) {
         console.error(red(`    error ${s.platform}/${code}/${s.type}: ${e.message}`));
       }

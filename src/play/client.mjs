@@ -9,13 +9,16 @@ const UPLOAD = "https://androidpublisher.googleapis.com/upload/androidpublisher/
 // transaction — insert an edit, mutate listings/images/details against it, then commit (all-or-nothing).
 // Nothing is live until commit; a dropped edit changes nothing. Image bytes go to the /upload endpoint.
 export class PlayClient {
-  static async create({ keyPath, packageName }) {
+  static async create({ keyPath, packageName, dryRun = false }) {
     const token = await getAccessToken(keyPath);
-    return new PlayClient(token, packageName);
+    return new PlayClient(token, packageName, dryRun);
   }
-  constructor(token, packageName) {
+  constructor(token, packageName, dryRun = false) {
     this.token = token;
     this.pkg = packageName;
+    // Gates the COMMIT, not the requests: the edit is still built and validated against Google for real,
+    // which is the whole advantage of Play's transaction over Apple's fire-and-forget PATCHes.
+    this.dryRun = dryRun;
   }
 
   async req(method, subpath, { body, base = BASE } = {}) {

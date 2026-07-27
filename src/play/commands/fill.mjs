@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { green, yellow, red } from "../../util.mjs";
+import { reportCrossStore } from "../../crossStore.mjs";
 
 const FIELDS = [["title", "title"], ["shortDescription", "short_description"], ["fullDescription", "full_description"]];
 // Play image type -> local source (a dir of PNGs = screenshots; a single file = graphic). From zdymak.
@@ -16,12 +17,12 @@ const IMAGES = [
 
 // Push the Play listing (text + images) inside one Edit, then validate and commit. iOS/Android are separate
 // stores — this is the Google half. Images only touch a type whose local asset EXISTS (so a missing local
-// set never deletes the live one). VYDANNE_DRY=1 validates and discards without committing.
+// set never deletes the live one). Without `--apply` it validates and discards without committing.
 export async function run(config, client) {
   const g = config.google;
-  // SAFE BY DEFAULT: validate + discard the edit unless VYDANNE_COMMIT=1. A store-mutating commit must be
-  // an explicit opt-in — never the default (a stale/partial local set could otherwise clobber a live one).
-  const commit = process.env.VYDANNE_COMMIT === "1";
+  // SAFE BY DEFAULT: validate + discard the edit unless `--apply`. A store-mutating commit must be an
+  // explicit opt-in — never the default (a stale/partial local set could otherwise clobber a live one).
+  const commit = !client.dryRun;
   const localLangs = fs.existsSync(g.metadataDir)
     ? fs.readdirSync(g.metadataDir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name)
     : [];
@@ -29,6 +30,12 @@ export async function run(config, client) {
   if (!localLangs.length && !haveImages) {
     console.log(yellow(`fill(play): no local listing folders under ${g.metadataDir} and no zdymak play assets — nothing to upload yet (populate them for Android Phase 2).`));
     return true;
+  }
+
+  if (process.env.VYDANNE_ALLOW_CROSS_STORE !== "1"
+      && !reportCrossStore("google", g.metadataDir, config.allowCrossStoreTerms)) {
+    console.error(red("fill(play): refusing to upload — fix the listing text, or set VYDANNE_ALLOW_CROSS_STORE=1."));
+    return false;
   }
 
   const editId = await client.newEdit();
@@ -57,7 +64,7 @@ export async function run(config, client) {
 
     const v = await client.validate(editId);
     if (v.status >= 300) throw new Error(`validate ${v.status}: ${JSON.stringify(v.json).slice(0, 200)}`);
-    if (!commit) { await client.deleteEdit(editId); console.log(yellow("fill(play): validated — DRY (nothing changed). Review the above, then set VYDANNE_COMMIT=1 to commit.")); return true; }
+    if (!commit) { await client.deleteEdit(editId); console.log(yellow("fill(play): validated — DRY (nothing changed). Review the above, then re-run with --apply to commit.")); return true; }
     const co = await client.commit(editId);
     if (co.status >= 300) throw new Error(`commit ${co.status}: ${JSON.stringify(co.json).slice(0, 200)}`);
     console.log(green("fill(play): committed."));

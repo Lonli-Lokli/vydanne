@@ -157,10 +157,42 @@ fastlane/metadata/en-US/keywords.txt
 ```sh
 npx vydanne preflight     # anything missing or too long?
 npx vydanne diff          # what exactly would change?
-npx vydanne fill          # do it
+npx vydanne fill          # DRY RUN — prints every write it would make
+npx vydanne fill --apply  # do it
 ```
 
 Run vydanne **from your project folder** — it finds everything relative to where you are.
+
+<br>
+
+## `--apply`, or nothing happens
+
+**Every command that can change a store is a dry run unless you pass `--apply`.** It reads the store,
+prints each write it would make, and sends nothing:
+
+```
+DRY RUN — 'fill' will not change App Store Connect. Add --apply to write.
+      would PATCH /v1/appStoreVersionLocalizations/ad2f… — description, keywords, whatsNew
+      …
+DRY RUN — 40 store write(s) withheld. Re-run with --apply to perform them.
+```
+
+The commands this applies to are marked `✎` in `vydanne help`: `fill`, `previews`, `age-rating`,
+`review-contact`, `accessibility`, `prerelease`. Everything else only reads, and ignores the flag.
+
+Two details worth knowing:
+
+- **A dry run walks the whole plan.** It does not stop at the first locale — the count at the end is the
+  number to compare against `diff`. "Nothing to write" and "nothing happened" are different sentences, and
+  only the first one means your local files already match the store.
+- **The two stores enforce it differently, deliberately.** Play builds the Edit and *validates it against
+  Google* for real, then discards it — so a dry run catches everything a commit would have caught. Apple
+  has no transaction to roll back, so there the block is at the HTTP layer: no `POST`/`PATCH`/`PUT`/
+  `DELETE` leaves the process at all. `prerelease` also refuses the `altool` upload, after validating the
+  archive.
+
+> Upgrading from ≤ 0.5? The Apple half used to write immediately — `vydanne fill` now needs `--apply`.
+> `VYDANNE_COMMIT=1` still works as an alias so existing Play scripts keep running, but prefer the flag.
 
 <br>
 
@@ -168,9 +200,9 @@ Run vydanne **from your project folder** — it finds everything relative to whe
 
 | Command | In plain English |
 |---|---|
-| `preflight` | **Run this first.** Checks the listing is complete and nothing is over a character limit. Green means submittable. |
+| `preflight` | **Run this first.** Checks the listing is complete, nothing is over a character limit, and no locale mentions the other app store. Green means submittable. |
 | `diff` | Shows exactly what's different between your files and what's live. Nothing is changed — a safe preview. |
-| `fill` | Uploads your listing text and screenshots. Handles iPhone, iPad and Mac. |
+| `fill` | Uploads your listing text and screenshots. Handles iPhone, iPad and Mac. Refuses to upload text that names the other mobile platform. |
 | `previews` | Uploads App Preview videos. |
 | `inspect` | Shows the app's current state in the store. Read-only. |
 | `locales` | Lists your languages and Apple's code for each — and warns about any language the App Store doesn't offer. |
@@ -184,6 +216,9 @@ Run vydanne **from your project folder** — it finds everything relative to whe
 
 For **Google Play**, add `--store google` to `inspect`, `diff`, `preflight`, `fill`, or `prerelease`.
 
+`fill`, `previews`, `age-rating`, `review-contact`, `accessibility` and `prerelease` change the store, so
+they need [`--apply`](#--apply-or-nothing-happens); without it they report and exit.
+
 <br>
 
 ## Google Play
@@ -193,9 +228,8 @@ Add a `google` block to your config and point `PLAY_JSON_KEY_FILE` at a service-
 
 ```sh
 npx vydanne preflight --store google
-npx vydanne fill --store google                    # dry run — shows what would change
-VYDANNE_COMMIT=1 npx vydanne fill --store google   # actually do it
-#   Windows PowerShell:  $env:VYDANNE_COMMIT = "1"; npx vydanne fill --store google
+npx vydanne fill --store google           # dry run — shows what would change
+npx vydanne fill --store google --apply   # actually do it
 ```
 
 ### `prerelease` — the build, to testers
@@ -246,8 +280,8 @@ a paid app they are the testers who install without buying it.
 **Google Play — a closed track**
 
 ```sh
-npx vydanne prerelease --store google                    # dry run
-VYDANNE_COMMIT=1 npx vydanne prerelease --store google   # publish to the track
+npx vydanne prerelease --store google           # dry run
+npx vydanne prerelease --store google --apply   # publish to the track
 ```
 
 ```js
@@ -271,7 +305,7 @@ Play's 500-char cap with a warning. The versionCode comes from the bundle's own 
 numbering stays with the build and re-uploading a used code fails loudly instead of silently replacing a
 binary. Overrides: `VYDANNE_AAB`, `VYDANNE_TRACK`, `VYDANNE_RELEASE_NAME`.
 
-**Play is dry by default on purpose.** Nothing goes live until you add `VYDANNE_COMMIT=1`, so a
+**Play is dry by default on purpose.** Nothing goes live until you add `--apply`, so a
 half-finished folder can never overwrite a good listing. Play also uses its **own** language codes
 (`zh-CN`, `iw-IL`) which are *not* Apple's — `vydanne locales` and the
 [layout guide](GETTING_STARTED.md#6-put-your-text-and-images-where-vydanne-looks) keep them straight.
@@ -305,6 +339,7 @@ don't have to learn them the hard way.
 | Screenshots with transparency get rejected | Converts them to RGB |
 | Once a version is *Ready for Review*, most tools can no longer edit it | Uses a method that still works |
 | Character limits (30 / 30 / 100 / 170; purchases 30 / 45) | Checked before upload, not after rejection |
+| One translation says "also on Google Play" → rejected under guideline 2.3.10 | Every locale is scanned before upload; `preflight` and `fill` both refuse |
 | Apple's privacy section can't be reached by any API key | Prints the exact answers to paste in |
 | Accessibility labels can't publish before launch | Saved as a draft automatically |
 | In-app purchases need **two** different images, easily confused | Labels both slots |
@@ -342,6 +377,28 @@ Releasing a new version: [RELEASING.md](RELEASING.md).
 
 MIT.
 
+
+### One store never mentions the other
+
+Both stores reject a listing that advertises the competing platform — Apple under App Review
+guideline **2.3.10** ("no names, icons, or imagery of other mobile platforms"), Google under its
+Store Listing and Promotion policy. It is an easy mistake to make and an expensive one to find: the
+two listings come from the same source copy, so a single translator writing "auch für Android"
+costs a review cycle, in one locale out of twenty, days later.
+
+`preflight` and `fill` both scan the local metadata before anything is uploaded, per locale, per
+field — store names, store URLs, and the other platform's device names, in Latin script and in the
+localized forms (安卓, Андроид, アンドロイド, …). A store's OWN platform is never flagged: "Android"
+belongs in a Play listing. Neither does the bare word "Play", which every game listing uses.
+
+Ambiguous words ("apple" in a game about fruit) are reported as warnings and never block. If one
+genuinely belongs in your copy:
+
+```js
+allowCrossStoreTerms: ["Apple"],
+```
+
+`VYDANNE_ALLOW_CROSS_STORE=1` overrides the whole check for one run.
 
 ### Accessibility Nutrition Labels
 

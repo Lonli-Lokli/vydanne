@@ -6,7 +6,7 @@ import { resolveCredentials } from "./credentials.mjs";
 
 // The public config surface — the drift guards assert each key is documented (README/SKILL) and typed
 // (types/index.d.ts). Add a config knob → document + type it, or the guards fail before publish.
-export const CONFIG_KEYS = ["bundleId", "primaryLocale", "asc", "platforms", "uiLocales", "metadataDir", "rating", "privacy", "iaps", "previews", "export", "ios", "google", "accessibility"];
+export const CONFIG_KEYS = ["bundleId", "primaryLocale", "asc", "platforms", "uiLocales", "metadataDir", "rating", "privacy", "iaps", "previews", "export", "ios", "google", "accessibility", "allowCrossStoreTerms"];
 
 // One `vydanne.config.mjs` per app (ESM, like zdymak.config.mjs) — nothing hard-coded. Secrets stay out:
 // credentials resolve from the environment, a gitignored .env, or ~/.appstoreconnect/config.json (see
@@ -35,6 +35,8 @@ export async function loadConfig(p) {
     privacy: raw.privacy || { collected: ["CRASH_DATA", "PERFORMANCE_DATA"], tracking: false },
     iaps: raw.iaps || [],
     metadataDir: raw.metadataDir || "fastlane/metadata",
+    // Terms the cross-store check must not flag for this app (see src/crossStore.mjs).
+    allowCrossStoreTerms: raw.allowCrossStoreTerms || [],
     previews: raw.previews || null,
     export: raw.export || { encryption: "standard" },
     // Google Play. serviceAccountKey resolves from PLAY_JSON_KEY_FILE env first (keep the secret path out

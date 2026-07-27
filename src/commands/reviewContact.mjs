@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { green, red } from "../util.mjs";
+import { green, yellow, red } from "../util.mjs";
 
 // App Review contact from the GITIGNORED metadata/review_information/*.txt. PATCH (or POST) the review
 // detail directly — deliver can't do this cleanly pre-first-submission.
@@ -22,6 +22,7 @@ export async function run(config, client) {
     ? await client.patch(`/v1/appStoreReviewDetails/${existing.id}`, { data: { type: "appStoreReviewDetails", id: existing.id, attributes } })
     : await client.post(`/v1/appStoreReviewDetails`, { data: { type: "appStoreReviewDetails", attributes, relationships: { appStoreVersion: { data: { type: "appStoreVersions", id: v.id } } } } });
   if (r.status >= 300) { console.error(red(`review-contact: ${r.status}: ${JSON.stringify(r.json).slice(0, 200)}`)); return false; }
-  console.log(green(`review contact set -> ${attributes.contactFirstName} ${attributes.contactLastName} · ${attributes.contactPhone}`));
+  const who = `${attributes.contactFirstName} ${attributes.contactLastName} · ${attributes.contactPhone}`;
+  console.log(client.dryRun ? yellow(`review contact WOULD be set -> ${who}`) : green(`review contact set -> ${who}`));
   return true;
 }

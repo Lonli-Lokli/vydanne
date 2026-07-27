@@ -33,6 +33,9 @@ export async function uploadAsset(client, { type, setType, setId, filePath }) {
 
 // Previews process asynchronously — poll until Apple exposes videoUrl, then set the poster frame.
 export async function setPreviewPoster(client, previewId, frameTimeCode, { tries = 30, delayMs = 15000 } = {}) {
+  // In a dry run the preview was never created, so `previewId` is a synthetic `dry-run-<n>` and this would
+  // poll a 404 for seven and a half minutes before giving up.
+  if (client.dryRun) return true;
   for (let i = 0; i < tries; i++) {
     const { json } = await client.get(`/v1/appPreviews/${previewId}`);
     if (json.data?.attributes?.videoUrl) {

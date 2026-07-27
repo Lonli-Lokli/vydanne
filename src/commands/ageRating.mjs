@@ -28,6 +28,6 @@ export async function run(config, client) {
   };
   const r = await client.patch(`/v1/ageRatingDeclarations/${id}`, { data: { type: "ageRatingDeclarations", id, attributes } });
   if (r.status >= 300) { console.error(red(`age-rating: ${r.status}: ${JSON.stringify(r.json).slice(0, 200)}`)); return false; }
-  console.log(green("age rating set -> 4+"));
+  console.log(client.dryRun ? yellow("age rating WOULD be set -> 4+") : green("age rating set -> 4+"));
   return true;
 }

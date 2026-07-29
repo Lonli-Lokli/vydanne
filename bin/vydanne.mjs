@@ -128,6 +128,10 @@ usage: vydanne <command> [--apply] [--config vydanne.config.mjs]
                   skipped); every skip is reported again at the end, so green still means green.
                   Ends at a green preflight — Add to Review + Submit stay yours, in the web UI.
 ✎ fill            metadata + screenshots + previews (native; iOS & macOS separate)
+✎ appinfo         App Store category + the content-rights answer — the two app-level facts that
+                  block Add for Review and belong to no single release. 'categories' takes Apple's
+                  ids (GAMES, GAMES_PUZZLE — not display names); 'contentRights: false' for an app
+                  showing no third-party content. Set once; re-running is a no-op.
 ✎ age-rating      set the age rating (AppInfo declaration)
 ✎ review-contact  App Review contact from the gitignored files
 ✎ accessibility   Accessibility Nutrition Labels (draft; VYDANNE_A11Y_PUBLISH=1 to publish once live)

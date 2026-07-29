@@ -201,7 +201,7 @@ DRY RUN — 40 store write(s) withheld. Re-run with --apply to perform them.
 ```
 
 The commands this applies to are marked `✎` in the usage text (`vydanne` with no arguments): `prepare`, `push`, `fill`, `previews`,
-`age-rating`, `review-contact`, `accessibility`, `prerelease`. Everything else only reads, and ignores
+`appinfo`, `age-rating`, `review-contact`, `accessibility`, `prerelease`. Everything else only reads, and ignores
 the flag.
 
 Two details worth knowing:
@@ -232,6 +232,7 @@ Two details worth knowing:
 | `previews` | Uploads App Preview videos. |
 | `inspect` | Shows the app's current state in the store. Read-only. |
 | `locales` | Lists your languages and Apple's code for each — and warns about any language the App Store doesn't offer. |
+| `appinfo` | Sets the App Store **category** and the **content-rights** answer — the two app-level facts that block *Add for Review* and belong to no single release. Declared as `categories` (Apple's ids: `GAMES`, `GAMES_PUZZLE` — never display names) and `contentRights: false` for an app that shows no third-party content. Left undeclared, `contentRights` is not written at all, so an answer already given in App Store Connect is never overwritten by a default nobody chose. |
 | `age-rating` | Sets the age rating. `rating: "4+"` needs nothing else; any higher rating is described feature-by-feature in `ageRating` and Apple computes the band from it. |
 | `review-contact` | Fills in the App Review contact details (who Apple calls if there's a problem). |
 | `accessibility` | Saves Accessibility Nutrition Labels from the `accessibility` block in your config. Stays a draft until your app is live. Refuses to run if you have not declared one — see below. |
@@ -243,7 +244,7 @@ Two details worth knowing:
 
 For **Google Play**, add `--store google` to `inspect`, `diff`, `preflight`, `fill`, or `prerelease`.
 
-`prepare`, `push`, `fill`, `previews`, `age-rating`, `review-contact`, `accessibility` and `prerelease`
+`prepare`, `push`, `fill`, `previews`, `appinfo`, `age-rating`, `review-contact`, `accessibility` and `prerelease`
 change the store, so they need [`--apply`](#--apply-or-nothing-happens); without it they report and exit.
 
 ## The release pipeline — the order matters

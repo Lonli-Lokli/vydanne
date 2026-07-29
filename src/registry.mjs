@@ -19,6 +19,7 @@ export const COMMANDS = {
   // written to a live listing while everyone re-derived it. Stops at the first failure; never submits.
   push: { mod: "push", client: true, writes: true },
   fill: { mod: "fill", client: true, writes: true },
+  appinfo: { mod: "appInfo", client: true, writes: true },
   "age-rating": { mod: "ageRating", client: true, writes: true },
   "review-contact": { mod: "reviewContact", client: true, writes: true },
   accessibility: { mod: "accessibility", client: true, writes: true },

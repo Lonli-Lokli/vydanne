@@ -44,7 +44,12 @@ const NEXT_STEPS = [
 async function versionsFor(client, platform) {
   const { json } = await client.get(
     `/v1/apps/${client.appId}/appStoreVersions?filter[platform]=${platform}&limit=200` +
-      `&fields[appStoreVersions]=versionString,appStoreState`,
+      // `copyright` is requested because syncCopyright compares against it. A sparse fieldset that
+      // omits it does not read as absent — it reads as EMPTY, so the comparison can never match and
+      // the field is re-PATCHed on every run, spending a request to change nothing and printing
+      // "(was empty)" over a value that was already correct. A guard that cannot see the thing it
+      // guards is not a guard.
+      `&fields[appStoreVersions]=versionString,appStoreState,copyright`,
   );
   return json.data || [];
 }
@@ -68,6 +73,46 @@ function readCopyright(config) {
   const p = path.join(config.metadataDir, "copyright.txt");
   if (!fs.existsSync(p)) return null;
   return fs.readFileSync(p, "utf8").trim() || null;
+}
+
+/**
+ * Copyright on a version that ALREADY EXISTED.
+ *
+ * It was only ever set at creation, on the reasoning below that nothing else in vydanne writes this
+ * version-level field — which was true and yet left the gap wide open, because `prepare` is
+ * find-or-CREATE. Every app whose draft was made before `copyright.txt` existed, or made by hand in
+ * App Store Connect, or created by an older vydanne, reused that version forever and never got a
+ * copyright. The tooling then reported "prepare done — the version is editable" and the operator
+ * discovered the truth from Apple, at the end, as `Copyright - This field is required` on the Add
+ * for Review screen. The comment three lines down even called it "a metadata rejection waiting to
+ * happen".
+ *
+ * So the create path and the reuse path now converge: after this, a version has the copyright the
+ * repo declares, however that version came to exist.
+ *
+ * PATCHes only on a real difference. Apple's rate limits are per-app and a `prepare` that rewrites
+ * an already-correct field on every `push` spends a request to change nothing — and, more to the
+ * point, prints a line claiming it did something.
+ */
+async function syncCopyright(client, config, version) {
+  const want = readCopyright(config);
+  if (!want) return;
+  const have = version.attributes?.copyright ?? "";
+  if (have === want) return;
+
+  const was = have ? ` (was "${have}")` : " (was empty)";
+  const r = await client.patch(`/v1/appStoreVersions/${version.id}`, {
+    data: { type: "appStoreVersions", id: version.id, attributes: { copyright: want } },
+  });
+  if (r.status >= 300) {
+    console.error(red(`  could not set copyright (${r.status})`));
+    for (const e of r.json?.errors || []) console.error(`    ${e.title}: ${e.detail}`);
+    return;
+  }
+  version.attributes.copyright = want;
+  console.log(client.dryRun
+    ? yellow(`  WOULD set copyright: "${want}"${was}`)
+    : green(`  copyright set: "${want}"${was}`));
 }
 
 /**
@@ -117,6 +162,7 @@ export async function ensureVersion(client, config, platform, versionString) {
       return null;
     }
     console.log(green(`  version ${versionString} already exists (${state}) — reusing it`));
+    await syncCopyright(client, config, existing);
     return existing;
   }
 

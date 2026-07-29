@@ -56,8 +56,16 @@ try {
   console.log(`✓ npm: authenticated as '${who}'. '${name}' is unpublished — this will be the FIRST publish.`);
 }
 
-run('node scripts/check-docs.mjs'); //           fail early if docs drifted (also enforced on prepublishOnly)
-run('npm run check:types'); //                   types must match the config + command surface
+// EVERY check runs BEFORE anything mutates the repo — the rule the npm auth gate above already
+// states, and which these two lines used to half-keep. They ran docs and types but not
+// `check:config`, leaving it to `prepublishOnly`, which npm runs AFTER `npm version` has bumped
+// package.json and cut the tag. So the ordinary failure — a config key added and not threaded
+// through the loader — would abort the publish with the repo already committed and tagged for a
+// version that will never exist on the registry.
+//
+// `npm run verify` is the SAME script prepublishOnly runs, not a second copy of the list: two lists
+// drift, and it is always the early one that falls behind, leaving a guard that still reads like one.
+run('npm run verify'); //                        docs + types + config, exactly what prepublishOnly re-runs
 run(`npm version ${type} -m "release: v%s"`); // bumps package.json + creates the git tag
 run('npm publish --access public'); //           npm asks for your 2FA OTP
 run('git push --follow-tags');

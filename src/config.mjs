@@ -8,7 +8,7 @@ import { DEFAULT_PLAY_IMAGES } from "./play/images.mjs";
 
 // The public config surface — the drift guards assert each key is documented (README/SKILL) and typed
 // (types/index.d.ts). Add a config knob → document + type it, or the guards fail before publish.
-export const CONFIG_KEYS = ["bundleId", "primaryLocale", "asc", "platforms", "uiLocales", "localeMap", "metadataDir", "screenshots", "rating", "ageRating", "privacy", "iaps", "previews", "export", "ios", "google", "accessibility", "bridge", "push", "reviewContact", "allowCrossStoreTerms"];
+export const CONFIG_KEYS = ["bundleId", "primaryLocale", "asc", "platforms", "uiLocales", "localeMap", "metadataDir", "screenshots", "rating", "ageRating", "categories", "contentRights", "privacy", "iaps", "previews", "export", "ios", "google", "accessibility", "bridge", "push", "reviewContact", "allowCrossStoreTerms"];
 
 // One `vydanne.config.mjs` per app (ESM, like zdymak.config.mjs) — nothing hard-coded. Secrets stay out:
 // credentials resolve from the environment, a gitignored .env, or ~/.appstoreconnect/config.json (see
@@ -44,6 +44,12 @@ export async function loadConfig(p) {
     // Content descriptors for a rating above 4+. Null means "the 4+ shorthand", which `age-rating`
     // expands to an all-NONE declaration; anything else must be declared, never guessed.
     ageRating: raw.ageRating || null,
+    // App Store category, and whether the app shows third-party content. Both block Add for Review
+    // and neither has a safe default: a category guessed on the app's behalf is a shelf it did not
+    // choose, and a content-rights answer guessed on its behalf is a DECLARATION TO APPLE nobody
+    // made. So both stay null/undefined until declared, and `appinfo` refuses rather than assumes.
+    categories: raw.categories || null,
+    contentRights: raw.contentRights,
     privacy: raw.privacy || { collected: ["CRASH_DATA", "PERFORMANCE_DATA"], tracking: false },
     iaps: raw.iaps || [],
     metadataDir: raw.metadataDir || "fastlane/metadata",

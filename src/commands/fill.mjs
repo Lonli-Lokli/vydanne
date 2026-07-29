@@ -6,9 +6,15 @@ import { uploadAsset } from "../upload.mjs";
 import { reportCrossStore } from "../crossStore.mjs";
 import { deviceMap, screenshotBase, IMAGE_FILE } from "../screenshots.mjs";
 
-// Version-localization fields (attr -> metadata filename) and AppInfo fields (name/subtitle, shared).
+// Version-localization fields (attr -> metadata filename) and AppInfo fields (shared across releases).
 const VERSION_TXT = { description: "description", keywords: "keywords", promotionalText: "promotional_text", whatsNew: "release_notes", marketingUrl: "marketing_url", supportUrl: "support_url" };
-const INFO_TXT = { name: "name", subtitle: "subtitle" };
+// `privacyPolicyUrl` belongs here rather than on the version because it is an APP-level fact, not a
+// per-release one. Apple blocks Add for Review without it ("You must enter a Privacy Policy URL in
+// App Privacy") — a wall you hit at the very end, once everything else is green, and one nothing in
+// vydanne could clear because this map stopped at name/subtitle. It is per-LOCALE all the same, so a
+// game with a single policy page writes the same line into each locale's `privacy_url.txt`; the
+// filename follows fastlane's own convention, so an existing metadata tree needs no rearranging.
+const INFO_TXT = { name: "name", subtitle: "subtitle", privacyPolicyUrl: "privacy_url" };
 
 /**
  * PATCH a localization, surviving attributes Apple refuses to edit RIGHT NOW.

@@ -210,7 +210,7 @@ who it's for → honest close. Keep it scannable; lead each bullet with the payo
 ## B. Commands (push it)
 
 `fill` (metadata + screenshots, native PATCH/chunked upload — works even at READY_FOR_REVIEW) ·
-`previews` (App Preview videos) · `age-rating` · `review-contact` · `accessibility` (draft; publish once
+`previews` (App Preview videos) · `appinfo` (category + content rights) · `age-rating` · `review-contact` · `accessibility` (draft; publish once
 live) · `privacy` (prints answers for the UI — the API can't reach Apple's iris host) · `iap` (validate +
 RGB flatten) · `compliance` (US self-classification PDF) · `bridge` (zdymak's output → the folders
 `fill` reads) · `diff` (what differs vs live, text AND media by checksum) · `preflight`
@@ -303,7 +303,7 @@ The AAB binary and the (YouTube-URL) promo video stay outside vydanne.
 ## `--apply` — writes are opt-in
 
 **Every store-mutating command is a DRY RUN without `--apply`**: `prepare` · `push` · `fill` ·
-`previews` · `age-rating` · `review-contact` · `accessibility` · `prerelease` (marked `✎` in
+`previews` · `appinfo` · `age-rating` · `review-contact` · `accessibility` · `prerelease` (marked `✎` in
 the usage text, printed by `vydanne` with no arguments). They read the store, print each write they would make, and send nothing. Read-only
 commands ignore the flag.
 
@@ -343,3 +343,21 @@ promo) · char limits (name/subtitle 30, keywords 100, promo 170; IAP name 30 / 
 short 80 / full 4000) · **Play uses its OWN locale codes** · Play images push only when the local file
 exists, so a missing set never wipes the live one · Apple requires `name` when *creating* an app-info
 localization (409 otherwise).
+
+## The blockers that only appear on the Add for Review screen
+
+Apple checks these last, so a release can be green everywhere — metadata filled, screenshots up,
+build attached, `preflight` clean — and still stop dead with a list nobody can act on from a
+terminal. Four of the five are now vydanne's; the fifth is not reachable by any API.
+
+| blocker | who sets it |
+|---|---|
+| Privacy Policy URL | `fill` — `privacy_url.txt` per locale (an `appInfoLocalizations` field, so **every** locale needs it) |
+| Copyright | `prepare` — `<metadataDir>/copyright.txt`, on create **and** on reuse |
+| Primary category | `appinfo` — `categories` |
+| Content Rights | `appinfo` — `contentRights` |
+| **Price tier** | **App Store Connect UI.** Pricing is a separate agreement-bound surface; vydanne does not touch money. |
+
+`preflight` will NOT catch these. It verifies submission-completeness of the things it writes; a
+category it never sets is not a gap it knows to look for. Run `appinfo` once per app and the list
+shortens to the price.

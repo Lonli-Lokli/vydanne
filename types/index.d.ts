@@ -19,6 +19,11 @@ export type CommandName =
    */
   | 'push'
   | 'fill'
+  /**
+   * The two app-level facts that block **Add for Review** and belong to no single release: the App
+   * Store category, and whether the app shows third-party content. Set once; re-running is a no-op.
+   */
+  | 'appinfo'
   | 'age-rating'
   | 'review-contact'
   | 'accessibility'
@@ -66,6 +71,19 @@ export interface PreviewSpec {
   poster?: string;
   /** ASC locale codes to attach the preview to; defaults to the primary locale. */
   locales?: string[];
+}
+
+/**
+ * Apple's category ids, not display names: upper snake case, and game subcategories are `GAMES_*`
+ * ('GAMES_PUZZLE', never 'Puzzle'). Apple takes up to two subcategories per category.
+ */
+export interface CategoriesConfig {
+  primary: string;
+  primarySubcategoryOne?: string;
+  primarySubcategoryTwo?: string;
+  secondary?: string;
+  secondarySubcategoryOne?: string;
+  secondarySubcategoryTwo?: string;
 }
 
 export interface PrivacyConfig {
@@ -268,6 +286,17 @@ export interface VydanneConfig {
   rating?: string;
   /** Content descriptors for a rating above '4+'. Merged over an all-NONE base. */
   ageRating?: AgeRatingConfig;
+  /**
+   * App Store category, written by `appinfo`. Apple blocks Add for Review without a primary one, and
+   * subcategories are valid only under `'GAMES'`.
+   */
+  categories?: CategoriesConfig;
+  /**
+   * Does the app contain, show or access THIRD-PARTY content? Also blocks Add for Review. Left
+   * undefined it is not written at all, so an answer already given in App Store Connect is never
+   * overwritten by a default nobody chose — this is a declaration to Apple, not a preference.
+   */
+  contentRights?: boolean;
   privacy?: PrivacyConfig;
   iaps?: IapConfig[];
   previews?: PreviewSpec[];

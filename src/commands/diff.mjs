@@ -10,7 +10,12 @@ const VERSION_FIELDS = [
   ["description", "description", true], ["keywords", "keywords", false], ["promotionalText", "promotional_text", false],
   ["whatsNew", "release_notes", true], ["marketingUrl", "marketing_url", false], ["supportUrl", "support_url", false],
 ];
-const INFO_FIELDS = [["name", "name", false], ["subtitle", "subtitle", false]];
+// Must list everything `fill`'s INFO_TXT writes, or `diff` reports "in sync" over a field it never
+// looked at — which is not a harmless gap: `fill` PATCHes unconditionally (patchAttrs never compares),
+// so `diff` is the ONLY thing that can say whether a value actually reached Apple. When
+// privacyPolicyUrl was added to fill and not here, one command claimed 19 pending writes while the
+// other claimed sync, and neither was evidence of anything.
+const INFO_FIELDS = [["name", "name", false], ["subtitle", "subtitle", false], ["privacyPolicyUrl", "privacy_url", false]];
 
 const norm = (s) => (s == null ? null : String(s).replace(/\r/g, "").replace(/\n+$/, "").trim());
 const short = (s, n = 24) => { s = String(s).replace(/\n/g, " "); return s.length > n ? s.slice(0, n) + "…" : s; };

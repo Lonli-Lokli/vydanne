@@ -52,7 +52,8 @@
     "check:docs": "node scripts/check-docs.mjs",
     "check:types": "tsc --noEmit -p tsconfig.json && node scripts/check-types.mjs",
     "check:config": "node scripts/check-config.mjs",
-    "prepublishOnly": "npm run check:docs && npm run check:types && npm run check:config",
+    "verify": "npm run check:docs && npm run check:types && npm run check:config",
+    "prepublishOnly": "npm run verify",
     "release:patch": "node scripts/release.mjs patch",
     "release:minor": "node scripts/release.mjs minor",
     "release:major": "node scripts/release.mjs major"

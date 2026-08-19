@@ -224,7 +224,7 @@ Two details worth knowing:
 
 | Command | In plain English |
 |---|---|
-| `preflight` | **Run this first.** Checks the listing is complete, nothing is over a character limit, no locale mentions the other app store — and that the screenshots on the store are your *current* ones, not a stale set. Green means submittable. |
+| `preflight` | **Run this first.** Checks the listing is complete, nothing is over a character limit, no locale mentions the other app store — and that the screenshots on the store are your *current* ones, not a stale set. It also asserts the fields no local file drives and that no diff can therefore see: copyright, the App Review contact, the age rating, the primary category and the content-rights declaration. Those are each set by their own command, so a listing that never ran one had them EMPTY while this printed green. Green means submittable. |
 | `prepare` | Starts the next release: creates the App Store version you're preparing and attaches your newest build to it. **Needed before `fill` on an app that already has a version on sale** — until a draft exists there is nothing for the listing text to go into. Reuses the draft if it's already there, so it's safe to re-run. It does *not* submit. |
 | `push` | **The whole release, one command**: runs `prepare` → `fill` → `previews` → `age-rating` → `review-contact` → `accessibility` → `preflight`, in that order, stopping at the first failure. Dry run without `--apply`, like everything else. Ends at a green preflight — it never submits. |
 | `diff` | Shows exactly what's different between your files and what's live. Nothing is changed — a safe preview. |

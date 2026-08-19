@@ -16,6 +16,27 @@ export async function run(config, client) {
   // the README listed them among the limits "checked before upload". Read-only, so `allowLive` is
   // right: on an app with nothing in preparation the live record is the only one to measure.
   const info = await client.appInfo({ allowLive: true });
+
+  // ── The fields no LOCAL file drives ─────────────────────────────────────────────────────────────
+  //
+  // Everything else here compares local metadata against the store, which is the right question for
+  // anything `fill` uploads and the wrong one for the half-dozen fields set by their own standalone
+  // command. Those are invisible to a local-vs-remote diff: there is nothing local to differ from, so
+  // a field that was NEVER SET reads exactly like one that matches.
+  //
+  // Reported from the field: a listing reached PREPARE_FOR_SUBMISSION with an empty copyright and no
+  // App Review contact at all, while this command printed "no blockers". `prepare` sets the first and
+  // `review-contact` the second; neither is part of `fill`, and neither had ever been run. Preflight
+  // was not wrong so much as asked the wrong question — so it now also asks whether the listing is
+  // SUBMITTABLE, which only the store can answer.
+  const rights = client.app?.attributes?.contentRightsDeclaration;
+  if (!rights) problems.push("content rights not declared — `vydanne appinfo --apply`");
+  if (info) {
+    if (!info.attributes.appStoreAgeRating) problems.push("age rating not declared — `vydanne age-rating --apply`");
+    const primary = (await client.get(`/v1/appInfos/${info.id}/primaryCategory`)).json?.data?.id;
+    if (!primary) problems.push("primary category not set — `vydanne appinfo --apply`");
+  }
+
   if (info) {
     const infoLocs = (await client.get(`/v1/appInfos/${info.id}/appInfoLocalizations?limit=200`)).json.data || [];
     for (const il of infoLocs) {
@@ -37,6 +58,23 @@ export async function run(config, client) {
       continue;
     }
     console.log(`  ${platform}: version ${v.attributes.versionString} (${v.attributes.appStoreState})`);
+
+    // Required, and set by `prepare` from <metadataDir>/copyright.txt — not by `fill`.
+    if (!v.attributes.copyright) {
+      problems.push(`${platform}: copyright EMPTY — set ${config.metadataDir}/copyright.txt, then \`vydanne prepare --apply\``);
+    }
+
+    // The App Review contact. Apple will not take a submission without one, and it is per-VERSION, so
+    // a contact set on a previous version does not carry forward on its own.
+    const detail = (await client.get(`/v1/appStoreVersions/${v.id}/appStoreReviewDetail`)).json?.data?.attributes;
+    const CONTACT = ["contactFirstName", "contactLastName", "contactPhone", "contactEmail"];
+    const missing = detail ? CONTACT.filter((f) => !detail[f]) : CONTACT;
+    if (missing.length) {
+      problems.push(`${platform}: App Review contact ${detail ? `missing ${missing.join(", ")}` : "not set"} — \`vydanne review-contact --apply\``);
+    } else if (detail.demoAccountRequired && !detail.demoAccountName) {
+      // The rejection `review-contact` exists to avoid, arriving by the door of nobody running it.
+      problems.push(`${platform}: demoAccountRequired is true but no demo account is set — Apple rejects this`);
+    }
     const locs = await client.versionLocalizations(v.id);
     const ascLocales = [...new Set([config.primaryLocale, ...Object.values(res.supported)])];
 

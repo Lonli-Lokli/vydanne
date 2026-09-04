@@ -140,6 +140,15 @@ export interface GoogleConfig {
    */
   track?: string;
   /**
+   * What state a new release is created in. Defaults to 'completed' — the rollout starts on upload.
+   *
+   * Set 'draft' for an app that has NEVER been published: Play calls that a "draft app" and refuses
+   * a completed release on any track but internal, with a message that names neither the track nor
+   * the fix. A draft release waits in Play Console for a person to start it. Remove once live.
+   * Override: VYDANNE_STATUS.
+   */
+  releaseStatus?: "draft" | "inProgress" | "halted" | "completed";
+  /**
    * Play image type -> local source path. Merged over the defaults, so declare only what differs.
    * A type whose source does not exist is skipped; a missing local set never deletes the live one.
    */

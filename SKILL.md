@@ -286,6 +286,7 @@ With `--store google` it uploads an `.aab` to a **closed testing track** with re
 edit transaction. `production` is REFUSED — not flag-gated — so no argument combination ships to the
 public; promoting the tested build stays a human's job, mirroring the Apple side never submitting. Track
 comes from `google.track` / `VYDANNE_TRACK`, default `internal`; the bundle from `google.aab` /
+- `VYDANNE_STATUS` — release status for `prerelease --store google`: `draft`, `inProgress`, `halted`, `completed` (default). Use `draft` for an app that has never been published: Play refuses a completed release on any track but `internal` until it is live, and says so in a message that names neither the track nor the fix. Also settable as `google.releaseStatus`.
 `VYDANNE_AAB` (a directory takes its newest `.aab`). **For a PAID app use `internal`** — it's the only
 track where testers install without buying. Notes follow supply's layout, per locale, first match wins:
 `<google.metadataDir>/<play-locale>/changelogs/<versionCode>.txt` → `next.txt` → `default.txt`, capped

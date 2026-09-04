@@ -100,6 +100,11 @@ export default {
     // 'internal' (default), 'alpha', 'beta', or the name of any closed track you made in Play Console.
     // Only 'production' is refused.
     // track: "internal",
+    // What state a new release is created in: "draft" | "inProgress" | "halted" | "completed".
+    // Defaults to "completed" — the rollout starts on upload. An app that has NEVER been published
+    // is a "draft app" to Play, which refuses a completed release on any track but internal; set
+    // "draft" until it is live and start the rollout yourself in Console. Override: VYDANNE_STATUS.
+    // releaseStatus: "draft",
     // Play image type -> local source. Merged over the defaults, so override only what differs.
     // images: { icon: "brand/icons/play/icon-512.png", phoneScreenshots: "marketing/out/play-phone-plain" },
     // Play holds graphics PER LANGUAGE. Default is one set at `defaultLocale`; list locales (or "*")

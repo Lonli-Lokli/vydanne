@@ -92,13 +92,26 @@ export async function run(config, client) {
     if (!notes) notes = readNotes(g.metadataDir, versionCode, g.defaultLocale);
 
     // One complete release object: Play replaces the track's releases wholesale.
-    const release = { status: "completed", versionCodes: [String(versionCode)] };
+    //
+    // The status is settable because a DRAFT APP — one that has never been published — refuses a
+    // "completed" release on any track but internal, with
+    //   "Only releases with status draft may be created on draft app."
+    // which names neither the track nor the fix. Set VYDANNE_STATUS=draft for the first closed
+    // or open rollout of an app that is not live yet; the release then waits in Play Console for
+    // a human to start it, which is where an unpublished app's first rollout belongs anyway.
+    const status = process.env.VYDANNE_STATUS || g.releaseStatus || "completed";
+    if (!RELEASE_STATUSES.includes(status)) {
+      throw new Error(
+        `release status "${status}" is not one Play accepts — use one of ${RELEASE_STATUSES.join(", ")}`,
+      );
+    }
+    const release = { status, versionCodes: [String(versionCode)] };
     if (notes.entries.length) release.releaseNotes = notes.entries;
     const name = process.env.VYDANNE_RELEASE_NAME;
     if (name) release.name = name;
 
     const put = await client.putTrack(editId, track, [release]);
-    if (put.status >= 300) throw new Error(`tracks.update ${put.status}: ${JSON.stringify(put.json).slice(0, 300)}`);
+    if (put.status >= 300) throw new Error(explainPlayError("tracks.update", put, track, status));
 
     if (client.dryRun) {
       await client.deleteEdit(editId);
@@ -106,8 +119,17 @@ export async function run(config, client) {
       return true;
     }
     const res = await client.commit(editId);
-    if (res.status >= 300) throw new Error(`edits.commit ${res.status}: ${JSON.stringify(res.json).slice(0, 300)}`);
-    console.log(green(`\n  committed — versionCode ${versionCode} is live on "${track}".`));
+    if (res.status >= 300) throw new Error(explainPlayError("edits.commit", res, track, status));
+    // "live" is only true of a release that has actually started. A draft one is uploaded and
+    // waiting, and telling somebody it is live is how a build sits unnoticed for a week.
+    console.log(
+      status === "draft"
+        ? green(`\n  committed — versionCode ${versionCode} is on "${track}" as a DRAFT release.`)
+        : green(`\n  committed — versionCode ${versionCode} is live on "${track}".`),
+    );
+    if (status === "draft") {
+      console.log(`  Nobody has it yet: open Play Console and start the rollout when you are ready.`);
+    }
     archiveNextNotes(notes, versionCode);
     console.log("  Production stays manual: promote it in Play Console when you're ready.");
     return true;
@@ -208,4 +230,40 @@ function archiveNextNotes(notes, versionCode) {
       console.log(yellow(`  could not archive ${file}: ${e.message} — rename it to ${versionCode}.txt yourself, or the next release reuses it`));
     }
   }
+}
+
+/** The release statuses Play's Publishing API accepts. A typo here costs a round trip otherwise. */
+const RELEASE_STATUSES = ["draft", "inProgress", "halted", "completed"];
+
+/**
+ * Play's rejection, plus what to do about it.
+ *
+ * One rejection is worth translating rather than printing. An app that has never been published is
+ * a "draft app", and Play will not accept a `completed` release on any track except internal:
+ *
+ *     Only releases with status draft may be created on draft app.
+ *
+ * That sentence names neither the track it is talking about nor the setting that fixes it, and it
+ * arrives identically from the track update and from the commit — so the same upload succeeds on
+ * `internal` and fails on `alpha` with a message that suggests nothing about tracks at all. The
+ * fix is one setting, and it belongs in the error rather than in somebody's memory.
+ */
+function explainPlayError(where, res, track, status) {
+  const body = JSON.stringify(res.json).slice(0, 300);
+  const message = res.json?.error?.message || "";
+  if (/draft app/i.test(message)) {
+    return [
+      `${where} ${res.status}: ${message}`,
+      "",
+      `  This app has never been published, so Play calls it a draft app — and a draft app only`,
+      `  accepts releases whose status is "draft". You asked for "${status}" on track "${track}".`,
+      "",
+      `  Set it once in your config:      google: { releaseStatus: "draft" }`,
+      `  Or for this run only:            VYDANNE_STATUS=draft`,
+      "",
+      `  The build then waits in Play Console for a person to start the rollout, which is where an`,
+      `  unpublished app's first one belongs. Remove the setting once the app is live.`,
+    ].join("\n");
+  }
+  return `${where} ${res.status}: ${body}`;
 }

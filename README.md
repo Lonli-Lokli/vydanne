@@ -218,6 +218,11 @@ Two details worth knowing:
 > Upgrading from ≤ 0.5? The Apple half used to write immediately — `vydanne fill` now needs `--apply`.
 > `VYDANNE_COMMIT=1` still works as an alias so existing Play scripts keep running, but prefer the flag.
 
+`fill` takes four more overrides, all off by default: `VYDANNE_REPLACE=1` replaces a store screenshot
+set instead of leaving the live one alone (what you want after re-rendering them), and
+`VYDANNE_SKIP_METADATA=1` / `VYDANNE_SKIP_SCREENSHOTS=1` do one half of the job when the other is
+already right. `VYDANNE_FLATTEN=1` reads a flat screenshot folder rather than per-locale ones.
+
 <br>
 
 ## What each command does
@@ -379,7 +384,15 @@ Notes are truncated to Play's 500-char cap with a warning. The versionCode comes
 manifest — vydanne reads it out of the `.aab` locally and reports which changelog file each locale
 resolves to *before* the upload, so a wrong file costs a re-run, not a re-release. Re-uploading a used
 code fails loudly instead of silently replacing a binary. Overrides: `VYDANNE_AAB`, `VYDANNE_TRACK`,
-`VYDANNE_RELEASE_NAME`.
+`VYDANNE_RELEASE_NAME`, `VYDANNE_STATUS`; and `VYDANNE_IPA` for the App Store half.
+
+**An app that has never been published needs `releaseStatus: "draft"`.** Play calls it a *draft app*
+and refuses a `completed` release on every track except `internal`, answering *"Only releases with
+status draft may be created on draft app."* — which names neither the track nor the fix, and is why
+the same bundle uploads to `internal` and fails on `alpha`. Set it in `google.releaseStatus` (or
+`VYDANNE_STATUS=draft` for one run); the build then waits in Play Console for a person to start the
+rollout, which is where an unpublished app's first one belongs. Remove it once the app is live.
+vydanne explains this rejection rather than printing Play's version of it.
 
 **Play is dry by default on purpose.** Nothing goes live until you add `--apply`, so a
 half-finished folder can never overwrite a good listing. Play also uses its **own** language codes

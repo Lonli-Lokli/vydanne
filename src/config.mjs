@@ -98,6 +98,12 @@ export async function loadConfig(p) {
           defaultLocale: raw.google.defaultLocale || raw.primaryLocale,
           aab: raw.google.aab || null,
           track: raw.google.track || "internal", // testing only — `prerelease` refuses production
+          // What state a new release is created in: draft | inProgress | halted | completed.
+          // Left null so `prerelease` keeps its own default ("completed"). The one case that needs
+          // it is an app that has never been published — Play calls that a "draft app" and refuses
+          // a completed release on any track but internal, so the first closed or open rollout has
+          // to be created as "draft" and started by a person in Console.
+          releaseStatus: raw.google.releaseStatus || null,
           // Play image type -> local source path. Merged over the defaults so an app overrides only the
           // slots whose layout differs; the default for `icon` points at znachok's output, which is a
           // sensible default for this portfolio and a mystery to anyone else, so it is overridable.

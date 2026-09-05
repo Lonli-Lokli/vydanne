@@ -25,7 +25,23 @@ import zlib from "node:zlib";
  *
  * Those are full-pixel counts over the crop; the implementation samples every second pixel, which
  * scales them down but not the separation. See [BLANK_BELOW] for the figures the threshold is
- * actually set from. It is a blankness detector, not a judgement about how busy a screenshot is.
+ * actually set from.
+ *
+ * ### It is a BACKSTOP, and the limit is worth stating rather than discovering
+ *
+ * A composed screenshot is a device frame on a background under a caption, so any measurement of it
+ * depends on the composition. This crop works for the frames every app in this portfolio produces,
+ * where the device is full-bleed and the middle of the image IS the screen. On a layout that insets
+ * the device on a generous background, the same crop catches gradient instead: zdymak's own demo
+ * composition scores 204 on a frame whose screen is pure white, and would pass here.
+ *
+ * There is no crop that fixes it. Measured across the portfolio, at a crop tight enough to exclude
+ * background the blanks land on 8, 9 and 10 — and the quietest genuine screenshot lands on 9.
+ *
+ * The reliable gate is upstream: `zdymak` measures the CAPTURE, which has no frame, background or
+ * caption, and separates unambiguously with no crop at all. This one exists because vydanne is the
+ * last thing before the store and sees screenshots that never came from zdymak. It catches the
+ * failure that actually shipped; it is not a proof that a listing has no blank in it.
  *
  * ### PNG only, and decoded here rather than by a dependency
  *

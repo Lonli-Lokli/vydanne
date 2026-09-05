@@ -353,6 +353,18 @@ screenshot should be.
 
 It found a second one on its first run, in a game that has not shipped yet.
 
+**It is a backstop, not a proof, and the limit is structural.** A composed screenshot's measurement
+depends on its composition: this crop works where the device is full-bleed and the middle of the
+image is the screen, which is what every app here produces, but a layout that insets the device on a
+generous background puts gradient in the crop — zdymak's own demo composition scores 204 on a frame
+whose screen is pure white. No tighter crop fixes it: at one tight enough to exclude background the
+blanks land on 8–10 and the quietest genuine screenshot lands on 9.
+
+The reliable gate is upstream. `zdymak` measures the **capture**, which has no frame, background or
+caption and separates with no crop at all — under 400 distinct colours *and* over 95% one colour.
+This check exists because vydanne is the last thing before the store and sees screenshots that never
+came from zdymak.
+
 ## `--apply` — writes are opt-in
 
 **Every store-mutating command is a DRY RUN without `--apply`**: `prepare` · `push` · `fill` ·

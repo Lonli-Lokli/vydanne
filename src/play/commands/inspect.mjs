@@ -25,23 +25,39 @@ export async function run(config, client) {
     }
     console.log(`  images (${lang}): ${counts.join("  ") || "(none)"}`);
 
-    // Tracks, newest release first within each. A track with no releases is omitted rather than
-    // printed empty: Play returns every track it knows about, including ones this app has never
-    // shipped to, and listing those as blank rows buries the two lines that matter.
-    const tracks = (await client.listTracks(editId)).json.tracks || [];
+    // What is actually ON each track, which is NOT what the edit says is on it.
+    //
+    // The edit's own `tracks` gives the desired state — the last thing written — so straight after
+    // an upload it happily reports the new build and nothing else. The track's `releases` endpoint
+    // reports reality: the build in review AND the older one still serving testers underneath it,
+    // because a new build does not reach anyone until review passes. Reporting the edit view alone
+    // said a release was live when nobody had it (measured on Niva, 2026-09-05).
+    //
+    // So the edit is used only to enumerate track NAMES; every state below comes from the
+    // non-edit endpoint.
+    const LIFECYCLE = {
+      RELEASE_LIFECYCLE_STATE_PUBLISHED: "published",
+      RELEASE_LIFECYCLE_STATE_IN_REVIEW: "in review",
+      RELEASE_LIFECYCLE_STATE_DRAFT: "draft",
+      RELEASE_LIFECYCLE_STATE_HALTED: "halted",
+      RELEASE_LIFECYCLE_STATE_UNSPECIFIED: "unspecified",
+    };
+    const names = ((await client.listTracks(editId)).json.tracks || []).map((t) => t.track);
     const rows = [];
-    for (const t of tracks) {
-      for (const rel of t.releases || []) {
-        const codes = rel.versionCodes || [];
-        if (!codes.length) continue;
-        // `userFraction` is only present on a staged rollout; absent means the release is at 100%.
+    for (const name of names) {
+      // A track the app has never shipped to answers 404 here. That is information, not an error:
+      // it is the difference between "empty" and "does not exist", and neither is worth a row.
+      const res = await client.trackReleases(name).catch(() => null);
+      for (const rel of res?.json?.releases || []) {
+        const codes = (rel.activeArtifacts || []).map((a) => a.versionCode).join(",") || "-";
+        const state = LIFECYCLE[rel.releaseLifecycleState] || rel.releaseLifecycleState || "?";
         const staged = rel.userFraction != null ? `  ${Math.round(rel.userFraction * 100)}% rollout` : "";
-        rows.push(`    ${t.track.padEnd(12)} ${codes.join(",").padEnd(8)} ${(rel.name || "-").padEnd(12)} ${rel.status}${staged}`);
+        rows.push(`    ${name.padEnd(12)} ${codes.padEnd(8)} ${(rel.releaseName || "-").padEnd(12)} ${state}${staged}`);
       }
     }
     if (rows.length) {
-      console.log(`  tracks (${rows.length}):`);
-      console.log(`    ${"track".padEnd(12)} ${"code".padEnd(8)} ${"name".padEnd(12)} status`);
+      console.log(`  tracks (${rows.length} release(s)):`);
+      console.log(`    ${"track".padEnd(12)} ${"code".padEnd(8)} ${"name".padEnd(12)} state`);
       for (const r of rows) console.log(r);
     } else {
       console.log("  tracks: (nothing published — no track carries a release)");

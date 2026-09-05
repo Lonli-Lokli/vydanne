@@ -87,15 +87,33 @@ export class PlayClient {
   getTrack(editId, track) { return this.req("GET", `/edits/${editId}/tracks/${track}`); }
 
   /**
-   * Every track that has a release, in one call.
+   * The track NAMES this app has, from inside an edit.
    *
-   * `getTrack` needs the track's name, which is only useful once you already know what to ask for —
-   * and the names are not fixed: a `production` track exists only after the first public release,
-   * and a developer can add custom closed tracks beyond `alpha`/`beta`. So "what is actually
-   * published, and where" could not be answered by this client at all until this existed; it had to
-   * be worked out by hand against the raw API.
+   * Only the names are worth taking from here. The `releases` this returns are the track's DESIRED
+   * state — whatever the last edit wrote — which is not what anyone means by "what is on the track".
+   * Use [trackReleases] for that; see its note.
    */
   listTracks(editId) { return this.req("GET", `/edits/${editId}/tracks`); }
+
+  /**
+   * What is ACTUALLY on a track: every non-obsolete release, with its lifecycle state.
+   *
+   * Needs no edit, and it is a different answer from `edits/…/tracks`. That one reports the last
+   * write; this reports reality, and the two disagree exactly when it matters most. Measured on
+   * Niva, 2026-09-05:
+   *
+   *   edits/…/tracks   alpha → [131]                       "the upload worked"
+   *   tracks/alpha/…   alpha → 1.4 (131) IN_REVIEW
+   *                          + 1.0 (102) PUBLISHED         "…and testers still have 1.0"
+   *
+   * A newly uploaded build does not reach testers until review passes, so the previously published
+   * release keeps serving — and the edit-based view cannot see it at all. Reporting only the edit
+   * view meant `inspect` said a release was live when nobody had it yet.
+   *
+   * Shape differs from the edits API too: `releaseName`, `activeArtifacts[].versionCode` and
+   * `releaseLifecycleState`, not `name`/`versionCodes`/`status`.
+   */
+  trackReleases(track) { return this.req("GET", `/tracks/${encodeURIComponent(track)}/releases`); }
 
   /**
    * Point a track at version codes. `releases` is the FULL desired state of that track — Play replaces

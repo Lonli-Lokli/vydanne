@@ -297,6 +297,11 @@ than silent. The versionCode is read out of the `.aab` locally and the changelog
 BEFORE the upload; re-uploading a used code fails loudly instead of silently replacing. DRY by default;
 `--apply` publishes.
 
+`inspect --store google` also reports **which build is on which track** — versionCode, version
+name, status, and a staged rollout's percentage — for every track that carries a release. Tracks
+with no release are omitted. That is the question after any upload, and it could not be answered
+from this tool at all before 0.11.
+
 `--store google` routes `inspect` · `diff` · `preflight` · `fill` · `prerelease` to the Play Developer **Edits** API
 (OAuth2 service account; **scoped to the config's `packageName`** — a shared key can't touch another app).
 The AAB binary and the (YouTube-URL) promo video stay outside vydanne.

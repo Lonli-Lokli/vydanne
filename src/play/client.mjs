@@ -87,6 +87,17 @@ export class PlayClient {
   getTrack(editId, track) { return this.req("GET", `/edits/${editId}/tracks/${track}`); }
 
   /**
+   * Every track that has a release, in one call.
+   *
+   * `getTrack` needs the track's name, which is only useful once you already know what to ask for —
+   * and the names are not fixed: a `production` track exists only after the first public release,
+   * and a developer can add custom closed tracks beyond `alpha`/`beta`. So "what is actually
+   * published, and where" could not be answered by this client at all until this existed; it had to
+   * be worked out by hand against the raw API.
+   */
+  listTracks(editId) { return this.req("GET", `/edits/${editId}/tracks`); }
+
+  /**
    * Point a track at version codes. `releases` is the FULL desired state of that track — Play replaces
    * it wholesale, so send one complete release object rather than appending to what is already there.
    */

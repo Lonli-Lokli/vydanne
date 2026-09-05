@@ -68,6 +68,47 @@ async function altool(args, credentials) {
   return run_("xcrun", full, { maxBuffer: 32 * 1024 * 1024 });
 }
 
+/**
+ * **The highest build number this app has, which is not the same as the newest.**
+ *
+ * [newestBuild] sorts by upload date, and that is the wrong baseline for a gate: on 2026-09-04
+ * Vodar's newest upload WAS the broken one, a build numbered `1` sitting above a `131`, so
+ * comparing against it would have compared 1 with 1 and waved it through. The invariant is about
+ * the maximum, so read the maximum.
+ */
+async function highestBuildNumber(client) {
+  const { json } = await client.get(
+    `/v1/builds?filter[app]=${client.appId}&sort=-uploadedDate&limit=200&fields[builds]=version`,
+  );
+  let max = null;
+  for (const b of json.data || []) {
+    const n = Number(b.attributes?.version);
+    if (Number.isFinite(n) && (max == null || n > max)) max = n;
+  }
+  return max;
+}
+
+/**
+ * The CFBundleVersion inside the .ipa, read before anything is uploaded.
+ *
+ * The Play side has always read the versionCode out of the bundle before the transfer; Apple's did
+ * not, so the first place a build number became visible was App Store Connect — after the upload,
+ * which is after it is too late. macOS-only tools are fine here: this command already requires
+ * `xcrun altool`.
+ */
+async function ipaBuildNumber(ipa) {
+  try {
+    const { stdout } = await run_(
+      "/bin/sh",
+      ["-c", `unzip -p ${JSON.stringify(ipa)} 'Payload/*.app/Info.plist' | plutil -convert json -o - -`],
+      { maxBuffer: 32 * 1024 * 1024 },
+    );
+    return JSON.parse(stdout).CFBundleVersion ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** The newest build Apple has for this app, if any. */
 async function newestBuild(client) {
   const { json } = await client.get(
@@ -98,6 +139,30 @@ export async function run(config, client, credentials) {
   const size = (fs.statSync(ipa).size / 1e6).toFixed(1);
   console.log(green("prerelease → App Store Connect (TestFlight)"));
   console.log(`  archive: ${path.relative(process.cwd(), ipa) || ipa}  (${size} MB)`);
+
+  // THE BUILD NUMBER GATE. Read from the archive, checked before the transfer.
+  //
+  // Apple does not enforce this: CFBundleVersion only has to be unique within a marketing version,
+  // so a build numbered `1` uploaded above a `131` is accepted in silence. That happened on
+  // 2026-09-04 — a build-number fallback fired when git was unavailable at archive time, nothing
+  // failed anywhere, and the result is a binary that cannot be traced to a commit, tagged, or
+  // symbolicated. Google refuses the equivalent upload outright; this is the missing half.
+  //
+  // Refusing costs a re-archive. Accepting costs a permanently untraceable release.
+  const declared = await ipaBuildNumber(ipa);
+  const highest = await highestBuildNumber(client);
+  if (declared == null) {
+    console.log(yellow("  build ?  — could not read CFBundleVersion from the archive; not gated"));
+  } else {
+    console.log(`  build ${declared} (CFBundleVersion, read from the archive)`);
+    if (highest != null && Number(declared) <= highest) {
+      console.error(red(`  refusing: build ${declared} is not above ${highest}, which this app already has.`));
+      console.error("  A build number that did not grow is almost always a fallback firing — check that");
+      console.error("  the archive was made where git works, or pass BUILD_NUMBER=<n> deliberately.");
+      console.error("  Apple would accept this upload; it is not recoverable afterwards.");
+      return false;
+    }
+  }
 
   // Validate before uploading. A rejected upload has already cost the transfer; altool's validation
   // catches the common refusals (entitlements, missing icons, bad version) in seconds.

@@ -31,6 +31,12 @@ export const COMMANDS = {
   // compliance above), so it is not marked `writes` — it has its own `--dry-run` instead.
   bridge: { mod: "bridge", client: false },
   inspect: { mod: "inspect", client: true },
+  // Version HISTORY, which `inspect` structurally cannot show — it reports the version in
+  // preparation or the live one and nothing behind them. Read-only, and the reason it exists is on
+  // the record: three of Niva's release tags say in their own messages that they could not be
+  // confirmed "because historical build numbers are not exposed by vydanne inspect", and all three
+  // were wrong. The data was always one query away.
+  releases: { mod: "releases", client: true },
   diff: { mod: "diff", client: true },
   preflight: { mod: "preflight", client: true },
   // Uploads the .ipa to TestFlight. Needs the credentials as well as the client: the REST API
@@ -42,6 +48,7 @@ export const COMMANDS = {
 // (src/play/commands/). Store-specific commands (Apple accessibility/iap; Play data-safety) aren't shared.
 export const PLAY_COMMANDS = {
   inspect: { mod: "inspect" },
+  releases: { mod: "releases" },
   preflight: { mod: "preflight" },
   diff: { mod: "diff" },
   fill: { mod: "fill", writes: true },

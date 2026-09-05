@@ -38,6 +38,12 @@ export type CommandName =
    */
   | 'bridge'
   | 'inspect'
+  /**
+   * Version history with the build each release shipped, resolved to the commit that build number
+   * names (`git rev-list --count`) and whether it carries a tag. Read-only. With `--store google`,
+   * what each track is serving — Play keeps no history of superseded releases.
+   */
+  | 'releases'
   | 'diff'
   | 'preflight'
   /**

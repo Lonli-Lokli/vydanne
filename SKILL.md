@@ -214,7 +214,7 @@ who it's for → honest close. Keep it scannable; lead each bullet with the payo
 live) · `privacy` (prints answers for the UI — the API can't reach Apple's iris host) · `iap` (validate +
 RGB flatten) · `compliance` (US self-classification PDF) · `bridge` (zdymak's output → the folders
 `fill` reads) · `diff` (what differs vs live, text AND media by checksum) · `preflight`
-(completeness gate + cross-store lint + stale-screenshot check) · `inspect` · `auth` (what credentials
+(completeness gate + cross-store lint + stale-screenshot check) · `inspect` · `releases` · `auth` (what credentials
 resolved, and from where) · `locales` · `version`.
 
 **`bridge` maps by DIRECTORY, not by target.** zdymak writes each shot to `<dir || target>`, so a
@@ -302,7 +302,37 @@ name, status, and a staged rollout's percentage — for every track that carries
 with no release are omitted. That is the question after any upload, and it could not be answered
 from this tool at all before 0.11.
 
-`--store google` routes `inspect` · `diff` · `preflight` · `fill` · `prerelease` to the Play Developer **Edits** API
+## `releases` — what shipped, and from which commit
+
+`inspect` reports the version in preparation or the one live now. It structurally cannot show the
+ones behind them, and that gap has already cost: three of Niva's release tags carry messages saying
+they could not be confirmed *"because historical build numbers are not exposed by vydanne inspect"*,
+and all three were wrong — by 9, 3 and 23 commits. They had been tagged at the commits that bumped
+`MARKETING_VERSION`, which is the intuitive place and the wrong one, because the build is archived
+days later. The data was always one query away: `appStoreVersions?include=build`.
+
+`releases` is that query plus the two columns that make it useful — the **commit** each build number
+names and whether it carries a **tag**. Both stores in this portfolio derive the build number from
+`git rev-list --count HEAD` (Android's `versionCode`, iOS's `CURRENT_PROJECT_VERSION` via
+`Scripts/build-number.sh`), which makes it reversible.
+
+**Every mapping is verified, never assumed.** `rev-list --reverse` is ordered, not counted, so on a
+merged history the Nth line need not be the commit with N ancestors — the candidate's own count has
+to match. An app that does not build this way, or a build number that is not a commit count, gets a
+stated reason instead of a confident wrong answer. That check has already caught a real one: a build
+numbered `1` sitting above a `131`, which is a `getOrDefault(1)` fallback firing when the git count
+failed at archive time. That binary cannot be traced to a commit at all.
+
+Only what is **serving users** is nagged about — `READY_FOR_SALE`, and the `production` track. A
+version in review has not shipped, and this portfolio pushes to `alpha` before every promotion, so
+tagging either would make the tag mean nothing.
+
+With `--store google` it reports what each track carries now. **Play keeps no history**: there is no
+endpoint for superseded production releases, so a game that pushed several under one version name
+has no record of the earlier ones. Uploaded bundles are listed for context and must never be tagged
+from — uploaded is not released. Tag as you release.
+
+`--store google` routes `inspect` · `releases` · `diff` · `preflight` · `fill` · `prerelease` to the Play Developer **Edits** API
 (OAuth2 service account; **scoped to the config's `packageName`** — a shared key can't touch another app).
 The AAB binary and the (YouTube-URL) promo video stay outside vydanne.
 

@@ -48,8 +48,11 @@ export async function run(config, client) {
     for (const t of edited) {
       const res = await client.trackReleases(t.track);
       // 404 is information, not a failure: the app has never shipped to this track. "Does not
-      // exist" and "exists but empty" are different facts and neither earns a row.
-      if (res.status === 404) continue;
+      // exist" and "exists but empty" are different facts and neither earns a row — and 204 is the
+      // second of them, a track that exists and carries nothing, with no body to report. It was
+      // being reported as "could not be read", which put a warning on every app with an empty
+      // `beta` track. Found while writing `releases` against the same endpoint.
+      if (res.status === 404 || res.status === 204) continue;
       if (res.status !== 200) {
         // ANYTHING ELSE MUST NOT BE SWALLOWED. `req` returns a status rather than throwing, so an
         // earlier version of this that caught exceptions caught nothing at all — a 403 produced

@@ -1,6 +1,8 @@
 import { green, red, yellow, LIMITS, VERSION_FIELDS } from "../util.mjs";
 import { reportCrossStore } from "../crossStore.mjs";
-import { localScreenshots, remoteScreenshots, compareShots, localScreenshotLocales, unknownScreenshotDirs } from "../screenshots.mjs";
+import path from "node:path";
+import { localScreenshots, remoteScreenshots, compareShots, localScreenshotLocales, unknownScreenshotDirs, screenshotBase } from "../screenshots.mjs";
+import { centreColours, BLANK_BELOW } from "../blankShot.mjs";
 
 // Verify a listing is submission-complete the CORRECT way — each localization read by id (not the sparse
 // list), char limits, primary-locale coverage, per-platform — and warn on the gotchas before ASC does.
@@ -111,13 +113,33 @@ export async function run(config, client) {
       const count = Object.values(remote).reduce((n, m) => n + m.size, 0);
       // Only the primary listing MUST have screenshots — Apple falls back to it for any locale without.
       if (!count && code === config.primaryLocale) problems.push(`${platform}/${code}: no screenshots`);
+
       // Freshness is judged only where a local set exists: no local screenshots means there is nothing
       // to compare against, not that the store's are wrong. A display type the store has and local
       // lacks is likewise left alone — `fill` never deletes by omission, so this does not flag it.
       for (const [dt, L] of Object.entries(localScreenshots(platform, code, config))) {
+        const slot = dt.replace("APP_", "");
+
+        // IS THERE A SCREEN IN THE SCREENSHOT? Every other check here is about presence, naming and
+        // freshness, and a blank file passes all three perfectly — which is how Palon uploaded a
+        // device frame containing pure white and an iOS status bar to a version that reached App
+        // Store review. zdymak photographs whatever the app draws and reports success, the bridge
+        // copies what it is handed, `fill` uploads it. This is the only place in the chain that
+        // looks at the pixels. It runs before the comparison below on purpose: a blank file that
+        // matches the store is worse news than one that does not.
+        for (const name of L.keys()) {
+          const colours = centreColours(path.join(screenshotBase(platform, config), code, name));
+          if (colours !== null && colours < BLANK_BELOW) {
+            problems.push(
+              `${platform}/${code}: screenshot ${slot}/${name} is BLANK — ${colours} distinct ` +
+              "colours in the middle of the frame, so the app drew nothing. Re-capture it; " +
+              "uploading this ships a white rectangle to the store.",
+            );
+          }
+        }
+
         const c = compareShots(L, remote[dt] || new Map());
         if (!c) continue;
-        const slot = dt.replace("APP_", "");
         if (c.kind === "count") problems.push(`${platform}/${code}: screenshots ${slot} local ${c.local} / remote ${c.remote} — the store set is not the local one (\`fill\`, VYDANNE_REPLACE=1 to replace)`);
         else if (c.kind === "renamed") problems.push(`${platform}/${code}: screenshots ${slot} ${c.names.length} local file(s) not on the store by name (\`fill\`, VYDANNE_REPLACE=1 to replace)`);
         else if (c.kind === "stale") problems.push(`${platform}/${code}: screenshots ${slot} STALE — ${c.names.length} of ${c.of} differ in content; green would ship the old art (\`fill\`, VYDANNE_REPLACE=1 to replace)`);

@@ -336,6 +336,23 @@ from — uploaded is not released. Tag as you release.
 (OAuth2 service account; **scoped to the config's `packageName`** — a shared key can't touch another app).
 The AAB binary and the (YouTube-URL) promo video stay outside vydanne.
 
+## Blank screenshots — the check that had to exist
+
+Palon uploaded a device frame containing pure white and an iOS status bar to a version that reached
+App Store review, and every existing gate passed it. Presence: the file is there. Naming: it is
+named right. Freshness: it matches the store exactly. A blank file satisfies all three, and the
+chain around it is built to be faithful — zdymak photographs whatever the app draws and reports
+success, `bridge` copies what it is handed, `fill` uploads it. Nothing was looking at the pixels.
+
+`preflight` now measures distinct colours in the middle of each local screenshot, where a device
+frame's screen sits. Whole-frame colour counts do not separate — a caption band and its gradient
+contribute thousands of their own — but over the centre the failure scored **28** against
+**1500–6800** for real screens, with the quietest genuine screenshot in the portfolio at 270. The
+threshold sits 4x clear of both, so it is a fault detector rather than an opinion about how busy a
+screenshot should be.
+
+It found a second one on its first run, in a game that has not shipped yet.
+
 ## `--apply` — writes are opt-in
 
 **Every store-mutating command is a DRY RUN without `--apply`**: `prepare` · `push` · `fill` ·

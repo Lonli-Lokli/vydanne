@@ -42,25 +42,49 @@ export async function run(config, client) {
       RELEASE_LIFECYCLE_STATE_HALTED: "halted",
       RELEASE_LIFECYCLE_STATE_UNSPECIFIED: "unspecified",
     };
-    const names = ((await client.listTracks(editId)).json.tracks || []).map((t) => t.track);
+    const edited = (await client.listTracks(editId)).json.tracks || [];
     const rows = [];
-    for (const name of names) {
-      // A track the app has never shipped to answers 404 here. That is information, not an error:
-      // it is the difference between "empty" and "does not exist", and neither is worth a row.
-      const res = await client.trackReleases(name).catch(() => null);
-      for (const rel of res?.json?.releases || []) {
+    let degraded = null;
+    for (const t of edited) {
+      const res = await client.trackReleases(t.track);
+      // 404 is information, not a failure: the app has never shipped to this track. "Does not
+      // exist" and "exists but empty" are different facts and neither earns a row.
+      if (res.status === 404) continue;
+      if (res.status !== 200) {
+        // ANYTHING ELSE MUST NOT BE SWALLOWED. `req` returns a status rather than throwing, so an
+        // earlier version of this that caught exceptions caught nothing at all — a 403 produced
+        // zero rows and the command printed "nothing published" about an app with three live
+        // tracks. The endpoint is quota-limited ("Listing releases quota exceeded"), so this is a
+        // state a normal day reaches, not an exotic one. Fall back to the edit's view, which is the
+        // last write rather than what is serving, and label every row so it is never mistaken for
+        // the real thing.
+        degraded = res.json?.error?.message || `HTTP ${res.status}`;
+        for (const rel of t.releases || []) {
+          const codes = (rel.versionCodes || []).join(",") || "-";
+          if (codes === "-") continue;
+          rows.push(`  ~ ${t.track.padEnd(12)} ${codes.padEnd(8)} ${(rel.name || "-").padEnd(12)} ${rel.status || "?"}`);
+        }
+        continue;
+      }
+      for (const rel of res.json.releases || []) {
         const codes = (rel.activeArtifacts || []).map((a) => a.versionCode).join(",") || "-";
         const state = LIFECYCLE[rel.releaseLifecycleState] || rel.releaseLifecycleState || "?";
         const staged = rel.userFraction != null ? `  ${Math.round(rel.userFraction * 100)}% rollout` : "";
-        rows.push(`    ${name.padEnd(12)} ${codes.padEnd(8)} ${(rel.releaseName || "-").padEnd(12)} ${state}${staged}`);
+        rows.push(`    ${t.track.padEnd(12)} ${codes.padEnd(8)} ${(rel.releaseName || "-").padEnd(12)} ${state}${staged}`);
       }
     }
     if (rows.length) {
       console.log(`  tracks (${rows.length} release(s)):`);
       console.log(`    ${"track".padEnd(12)} ${"code".padEnd(8)} ${"name".padEnd(12)} state`);
       for (const r of rows) console.log(r);
+    } else if (degraded) {
+      console.log("  tracks: could not be read — " + degraded);
     } else {
       console.log("  tracks: (nothing published — no track carries a release)");
+    }
+    if (degraded && rows.length) {
+      console.log(`  ~ rows are the EDIT's view (what was last written), not what is serving.`);
+      console.log(`    Live state unavailable: ${degraded}`);
     }
   } finally {
     await client.deleteEdit(editId);

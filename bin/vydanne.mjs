@@ -144,6 +144,8 @@ usage: vydanne <command> [--apply] [--config vydanne.config.mjs]
   inspect         read-only ASC state
   releases        every version ever shipped, with the build and the commit it came from —
                   and whether that commit is tagged. --store google: what each track serves
+✎ withdraw        take a version back OUT of App Store review so it can be fixed. Refuses a
+                  LIVE version, the way --store google refuses the production track
   diff            show what differs between local (metadata/screenshots/previews) and ASC
   preflight       verify submission-completeness (the gotcha checker)
 ✎ prerelease      upload the build for testers — .ipa to TestFlight (internal groups only),

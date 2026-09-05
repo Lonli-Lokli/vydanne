@@ -44,6 +44,12 @@ export type CommandName =
    * what each track is serving — Play keeps no history of superseded releases.
    */
   | 'releases'
+  /**
+   * Take a version back out of App Store review so it can be edited — the step `prepare` and
+   * `prerelease` both tell you to do by hand. Refuses a LIVE version, mirroring the Play side's
+   * refusal of the production track. Undoes a submission; never makes one. Dry run without `--apply`.
+   */
+  | 'withdraw'
   | 'diff'
   | 'preflight'
   /**

@@ -37,6 +37,10 @@ export const COMMANDS = {
   // confirmed "because historical build numbers are not exposed by vydanne inspect", and all three
   // were wrong. The data was always one query away.
   releases: { mod: "releases", client: true },
+  // Takes a version back OUT of review, and it is the mirror of the Play side refusing the
+  // production track: it will retrieve something that is waiting, and it will not touch what
+  // customers already have. `writes` because it changes the store — dry run without --apply.
+  withdraw: { mod: "withdraw", client: true, writes: true },
   diff: { mod: "diff", client: true },
   preflight: { mod: "preflight", client: true },
   // Uploads the .ipa to TestFlight. Needs the credentials as well as the client: the REST API

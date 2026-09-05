@@ -76,16 +76,19 @@ async function altool(args, credentials) {
  * comparing against it would have compared 1 with 1 and waved it through. The invariant is about
  * the maximum, so read the maximum.
  */
-async function highestBuildNumber(client) {
+async function appBuilds(client) {
   const { json } = await client.get(
-    `/v1/builds?filter[app]=${client.appId}&sort=-uploadedDate&limit=200&fields[builds]=version`,
+    `/v1/builds?filter[app]=${client.appId}&sort=-uploadedDate&limit=200&fields[builds]=version,processingState`,
   );
-  let max = null;
+  let highest = null;
+  const held = new Map();
   for (const b of json.data || []) {
-    const n = Number(b.attributes?.version);
-    if (Number.isFinite(n) && (max == null || n > max)) max = n;
+    const raw = b.attributes?.version;
+    held.set(String(raw), b);
+    const n = Number(raw);
+    if (Number.isFinite(n) && (highest == null || n > highest)) highest = n;
   }
-  return max;
+  return { highest, held };
 }
 
 /**
@@ -150,12 +153,22 @@ export async function run(config, client, credentials) {
   //
   // Refusing costs a re-archive. Accepting costs a permanently untraceable release.
   const declared = await ipaBuildNumber(ipa);
-  const highest = await highestBuildNumber(client);
+  const { highest, held } = await appBuilds(client);
+  // Already on the app? Then this is not a new upload, it is the second half of one — the archive
+  // went up earlier and the version it was meant for was locked in review at the time. That is the
+  // exact shape `withdraw` creates, and re-uploading is both impossible (Apple refuses a repeated
+  // build number) and unnecessary. Skip to attaching it.
+  const alreadyUp = declared != null && held.has(String(declared));
   if (declared == null) {
     console.log(yellow("  build ?  — could not read CFBundleVersion from the archive; not gated"));
   } else {
     console.log(`  build ${declared} (CFBundleVersion, read from the archive)`);
-    if (highest != null && Number(declared) <= highest) {
+    if (alreadyUp) {
+      console.log(green("  already uploaded — skipping the transfer, attaching it below"));
+    } else if (highest != null && Number(declared) <= highest) {
+      // Not above the highest, and not one Apple holds: the number went BACKWARDS. That is a
+      // build-number fallback firing, not a re-run, and the two are worth telling apart — the
+      // first version of this gate refused both and made the legitimate case impossible.
       console.error(red(`  refusing: build ${declared} is not above ${highest}, which this app already has.`));
       console.error("  A build number that did not grow is almost always a fallback firing — check that");
       console.error("  the archive was made where git works, or pass BUILD_NUMBER=<n> deliberately.");
@@ -166,7 +179,7 @@ export async function run(config, client, credentials) {
 
   // Validate before uploading. A rejected upload has already cost the transfer; altool's validation
   // catches the common refusals (entitlements, missing icons, bad version) in seconds.
-  try {
+  if (!alreadyUp) try {
     await altool(["--validate-app", "-f", ipa, "-t", "ios"], credentials);
     console.log(green("  validated"));
   } catch (e) {
@@ -178,12 +191,16 @@ export async function run(config, client, credentials) {
   // The binary upload is the one mutation that does NOT go through the ASC client, so the client-level
   // dry-run gate cannot see it — it has to be refused here, or a dry run would ship a build to TestFlight.
   // Validation above has already run, which is the useful half: exactly Play's "validate, then discard".
-  if (client.dryRun) {
+  //
+  // Only when there IS an upload, though. With the build already on the app the rest of this command
+  // is ordinary client calls, which the client's own dry run already plans and withholds — returning
+  // here would hide the re-point that is the entire remaining point of the run.
+  if (client.dryRun && !alreadyUp) {
     console.log(yellow("  DRY RUN — archive validated, NOT uploaded. Re-run with --apply to send it to TestFlight."));
     return true;
   }
 
-  try {
+  if (!alreadyUp) try {
     await altool(["--upload-app", "-f", ipa, "-t", "ios"], credentials);
     console.log(green("  uploaded"));
   } catch (e) {
@@ -200,7 +217,7 @@ export async function run(config, client, credentials) {
     return false;
   }
 
-  const build = await waitForProcessing(client, before);
+  const build = alreadyUp ? held.get(String(declared)) : await waitForProcessing(client, before);
   if (!build) {
     console.log(yellow("  build not visible yet — Apple is still ingesting it."));
     console.log("  It will appear in TestFlight shortly; nothing further is needed here.");

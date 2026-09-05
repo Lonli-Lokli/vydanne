@@ -365,6 +365,29 @@ caption and separates with no crop at all — under 400 distinct colours *and* o
 This check exists because vydanne is the last thing before the store and sees screenshots that never
 came from zdymak.
 
+## `withdraw` — the step that was a web form
+
+A version sits in `WAITING_FOR_REVIEW` with something wrong in it — a blank screenshot, a build
+numbered by a fallback — and every command that could fix it refuses, correctly, because Apple locks
+a submitted version. `prepare` said *"withdraw it in App Store Connect, then re-run this"*.
+`prerelease` said *"re-pointing it would mean withdrawing that submission, which is your call."*
+Three files said the same thing and none of them could do it.
+
+**It is the mirror of Play's production refusal, not a new kind of power.** `prerelease --store
+google` refuses the `production` track outright because *"that release is a human's to make"*. This
+is the same rule pointed the other way: it takes back what is **waiting** and will not touch what
+customers have — a `READY_FOR_SALE` version is refused flatly. And it stays on the safe side of the
+line vydanne draws everywhere: it UNDOES a submission and never makes one. Submitting stays manual.
+
+Withdrawing is not free, so the states are enumerated rather than filtered. `WAITING_FOR_REVIEW`
+costs a place in the queue and nothing else. `IN_REVIEW` discards a review already in progress and
+is announced as such. `PENDING_DEVELOPER_RELEASE` is refused — that version is *approved and waiting
+on you*, and throwing that away to change a screenshot is almost never what anyone means.
+
+It waits for the version to actually leave review before returning. Apple passes through
+`CANCELING` first, and a command that returned there would send you straight into a `fill` that
+fails on a still-locked version.
+
 ## `--apply` — writes are opt-in
 
 **Every store-mutating command is a DRY RUN without `--apply`**: `prepare` · `push` · `fill` ·

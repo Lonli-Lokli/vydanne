@@ -491,6 +491,26 @@ allowCrossStoreTerms: ["Apple"],
 
 `VYDANNE_ALLOW_CROSS_STORE=1` overrides the whole check for one run.
 
+### When the build number is not the commit count
+
+`releases` maps a store's build number back to a commit because the build number IS
+`git rev-list --count`. A repo can be forced off that and be unable to get back: ship from a long
+branch, squash it onto the release branch, and the count lands *below* build numbers already
+uploaded. Google Play reserves every versionCode it has ever been given, so those numbers cannot
+be freed and the only way past them is a constant added to the count.
+
+```js
+buildNumberOffset: 100,   // build number = git rev-list --count <commit> + 100
+```
+
+`releases` then resolves commits again and prints the offset it applied, on both stores. Leave it
+at 0 — the default — for every app that never had the accident.
+
+It is the one input here vydanne **cannot** verify. The count check validates an index against its
+own commit, which a wrong offset passes just as cleanly as a right one, so a bad value names a
+wrong commit with full confidence. It is refused unless it is an integer, and reported wherever it
+is used, but keeping it true is yours.
+
 ### Accessibility Nutrition Labels
 
 Every other thing vydanne writes is a *fact* about your app. This one is a **claim about its

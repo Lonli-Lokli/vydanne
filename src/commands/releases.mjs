@@ -42,6 +42,10 @@ export async function run(config, client) {
 
   const order = commitOrder();
   if (!order) console.log(yellow("  not a git checkout — commit and tag columns unavailable"));
+  // Said once, not per row: the commit column is only as true as this number, and a reader who
+  // does not know it was applied has no way to tell a mapping from an assumption.
+  const offset = config.buildNumberOffset || 0;
+  if (order && offset) console.log(`  commit column assumes buildNumberOffset=${offset} (build = commits + ${offset})`);
 
   // Newest first: the question is almost always about the last one or two.
   versions.sort((a, b) => String(b.attributes.createdDate).localeCompare(String(a.attributes.createdDate)));
@@ -71,7 +75,7 @@ export async function run(config, client) {
     } else if (backwards) {
       note = yellow(backwards);
     } else {
-      const got = commitForBuild(order, build);
+      const got = commitForBuild(order, build, offset);
       if (got.sha) {
         commit = got.sha.slice(0, 9);
         const tags = tagsAt(got.sha);

@@ -41,6 +41,10 @@ export async function run(config, client) {
 
   const order = commitOrder();
   if (!order) console.log(yellow("  not a git checkout — commit and tag columns unavailable"));
+  // Said once, not per row: the commit column is only as true as this number, and a reader who
+  // does not know it was applied has no way to tell a mapping from an assumption.
+  const offset = config.buildNumberOffset || 0;
+  if (order && offset) console.log(`  commit column assumes buildNumberOffset=${offset} (versionCode = commits + ${offset})`);
 
   const editId = await client.newEdit();
   let uploaded = [];
@@ -92,7 +96,7 @@ export async function run(config, client) {
       let commit = "-";
       let tag = "-";
       let note = "";
-      const got = commitForBuild(order, row.code);
+      const got = commitForBuild(order, row.code, offset);
       if (got.sha) {
         commit = got.sha.slice(0, 9);
         const tags = tagsAt(got.sha);

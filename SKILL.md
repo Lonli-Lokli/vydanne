@@ -57,7 +57,7 @@ which user file was used, and whether the `.p8` is on disk.
 `{profile}` — selection only, never secrets) · `platforms` (iOS and macOS are SEPARATE) · `uiLocales`
 (auto-mapped to ASC codes) · `localeMap` · `metadataDir` · `screenshots` · `rating` · `ageRating` ·
 `privacy` · `iaps` · `previews` · `export` · `accessibility` · `ios` · `google` (Google Play) ·
-`bridge` · `push` · `reviewContact` · `allowCrossStoreTerms`.
+`bridge` · `push` · `reviewContact` · `allowCrossStoreTerms` · `buildNumberOffset`.
 
 **Paths are defaults, not laws.** `metadataDir` (default `fastlane/metadata`), `screenshots`
 (`{IOS, MAC_OS}`, default `fastlane/screenshots` + `-macos`) and `google.images` (Play image type →
@@ -316,7 +316,16 @@ names and whether it carries a **tag**. Both stores in this portfolio derive the
 `git rev-list --count HEAD` (Android's `versionCode`, iOS's `CURRENT_PROJECT_VERSION` via
 `Scripts/build-number.sh`), which makes it reversible.
 
-**Every mapping is verified, never assumed.** `rev-list --reverse` is ordered, not counted, so on a
+**`buildNumberOffset` when the count no longer matches.** A repo can be forced off the plain
+convention and be unable to get back: ship from a long branch, squash it onto the release branch,
+and the count lands BELOW versionCodes already uploaded — which Play reserves permanently, so a
+constant is the only way over them. `buildNumberOffset: 100` tells `releases` that
+`build = commits + 100`, and both commands print the offset they applied. It is the one number
+here vydanne cannot verify — the count check validates an index against its own commit and cannot
+tell a right offset from one wrong by five — so it is refused unless it is an integer, and stated
+wherever it is used rather than assumed.
+
+**Every other mapping is verified, never assumed.** `rev-list --reverse` is ordered, not counted, so on a
 merged history the Nth line need not be the commit with N ancestors — the candidate's own count has
 to match. An app that does not build this way, or a build number that is not a commit count, gets a
 stated reason instead of a confident wrong answer. That check has already caught a real one: a build

@@ -8,11 +8,26 @@ import { DEFAULT_PLAY_IMAGES } from "./play/images.mjs";
 
 // The public config surface — the drift guards assert each key is documented (README/SKILL) and typed
 // (types/index.d.ts). Add a config knob → document + type it, or the guards fail before publish.
-export const CONFIG_KEYS = ["bundleId", "primaryLocale", "asc", "platforms", "uiLocales", "localeMap", "metadataDir", "screenshots", "rating", "ageRating", "categories", "contentRights", "privacy", "iaps", "previews", "export", "ios", "google", "accessibility", "bridge", "push", "reviewContact", "allowCrossStoreTerms"];
+export const CONFIG_KEYS = ["bundleId", "primaryLocale", "asc", "platforms", "uiLocales", "localeMap", "metadataDir", "screenshots", "rating", "ageRating", "categories", "contentRights", "privacy", "iaps", "previews", "export", "ios", "google", "accessibility", "bridge", "push", "reviewContact", "allowCrossStoreTerms", "buildNumberOffset"];
 
 // One `vydanne.config.mjs` per app (ESM, like zdymak.config.mjs) — nothing hard-coded. Secrets stay out:
 // credentials resolve from the environment, a gitignored .env, or ~/.appstoreconnect/config.json (see
 // credentials.mjs) and are REFUSED if found in this committed file; review-contact PII stays gitignored.
+/**
+ * An integer config value, or the default when absent — and a refusal when it is neither.
+ *
+ * `buildNumberOffset: "100"` would otherwise coerce through the arithmetic and shift every commit
+ * lookup by a string, which resolves to a real commit and reports it with no hint anything is
+ * wrong. A value this load-bearing is worth one type check.
+ */
+function integerOr(name, value, fallback) {
+  if (value == null) return fallback;
+  if (!Number.isInteger(value)) {
+    throw new Error(`vydanne: config '${name}' must be an integer, got ${JSON.stringify(value)}`);
+  }
+  return value;
+}
+
 export async function loadConfig(p) {
   const file = path.resolve(p || process.env.VYDANNE_CONFIG || "vydanne.config.mjs");
   if (!fs.existsSync(file)) throw new Error(`vydanne: config not found at ${file}`);
@@ -71,6 +86,13 @@ export async function loadConfig(p) {
     bridge: raw.bridge
       ? { out: raw.bridge.out || null, apple: raw.bridge.apple || null, play: raw.bridge.play || null }
       : null,
+    // `build number = git rev-list --count <commit> + buildNumberOffset`, for a repo that was
+    // forced off the plain count and cannot get back — squash a long branch onto the release
+    // branch after shipping from it and the count lands below versionCodes already spent, which
+    // Play reserves forever. Unlike everything else in buildCommit.mjs this is a DECLARATION the
+    // tool cannot verify, so it is refused unless it is an integer and reported wherever it is
+    // applied. 0 means the plain convention, which is every app that never had the accident.
+    buildNumberOffset: integerOr("buildNumberOffset", raw.buildNumberOffset, 0),
     // Terms the cross-store check must not flag for this app (see src/crossStore.mjs).
     allowCrossStoreTerms: raw.allowCrossStoreTerms || [],
     previews: raw.previews || null,

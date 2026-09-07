@@ -10,7 +10,22 @@ import { execFileSync } from "node:child_process";
  * or reproducing a store binary needs the tree the archive was cut from, and a version string does
  * not identify one.
  *
- * ### Nothing here assumes the convention holds — it VERIFIES it, per build
+ * ### The offset, and what it costs
+ *
+ * `buildNumberOffset` shifts the relationship to `count + offset`, because a repo can be forced
+ * off the plain count and not be able to get back. Squash a long branch onto `master` after
+ * shipping from it and master's count lands BELOW build numbers already uploaded — and Google Play
+ * reserves every versionCode it has ever been given, so the only way over them is a constant.
+ *
+ * **The offset is a declaration this module cannot check**, and that is a real weakening worth
+ * stating rather than burying. The count check below verifies an INDEX against its own commit; it
+ * cannot tell a correct offset from one that is wrong by five, because the commit five places away
+ * verifies just as cleanly. So a wrong offset buys exactly the confident wrong answer everything
+ * else here exists to refuse. It is declared once per app, in a committed file, next to the script
+ * that stamps the number — and the commands say which offset they applied, so a reader can see the
+ * assumption instead of inheriting it.
+ *
+ * ### Nothing else here assumes the convention holds — it VERIFIES it, per build
  *
  * vydanne is pointed at apps that do not build this way, so a mapping that trusted the convention
  * would confidently name the wrong commit for them. Every answer below is checked
@@ -59,12 +74,20 @@ export function tagsAt(sha) {
  * Returns `{ sha }` when the count checks out, or `{ why }` naming what stopped it — which is the
  * useful half. "This build has no commit" is a finding about the release, not a gap in the tool.
  */
-export function commitForBuild(order, build) {
-  const n = Number(build);
+export function commitForBuild(order, build, offset = 0) {
+  const raw = Number(build);
   if (!order) return { why: "not a git checkout" };
-  if (!Number.isInteger(n) || n < 1) return { why: `build "${build}" is not a number` };
+  if (!Number.isInteger(raw)) return { why: `build "${build}" is not a number` };
+  // Every message below quotes the arithmetic when an offset is in play. A misconfigured offset
+  // surfaces here first, as a build that is impossibly far past HEAD, and "490 - 100 = 390, past
+  // HEAD (200 commits)" says which of the two numbers to go and look at.
+  const n = raw - offset;
+  const shown = offset ? `build ${raw} - offset ${offset} = ${n}` : `build ${n}`;
+  if (n < 1) {
+    return { why: `${shown} is below the first commit — the offset is larger than the build number` };
+  }
   if (n > order.length) {
-    return { why: `build ${n} is past HEAD (${order.length} commits) — built elsewhere, or on an unmerged branch` };
+    return { why: `${shown} is past HEAD (${order.length} commits) — built elsewhere, or on an unmerged branch` };
   }
   const sha = order[n - 1];
   let count;

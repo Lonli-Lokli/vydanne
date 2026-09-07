@@ -343,6 +343,18 @@ export interface VydanneConfig {
    * "apple"); it is not a way to ship a store name.
    */
   allowCrossStoreTerms?: string[];
+
+  /**
+   * `build number = git rev-list --count <commit> + buildNumberOffset`. Defaults to 0, which is
+   * the plain convention.
+   *
+   * Set it only for a repo that was forced off the plain count and cannot get back: ship from a
+   * long branch, squash that branch onto the release branch, and the count lands below build
+   * numbers already uploaded — which Google Play reserves permanently, so a constant is the only
+   * way over them. It is a declaration vydanne cannot verify, so keep it true; a wrong one names
+   * a wrong commit as confidently as a right one.
+   */
+  buildNumberOffset?: number;
 }
 
 /** Thin ASC REST client (native fetch + ES256 JWT). */

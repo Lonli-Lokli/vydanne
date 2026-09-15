@@ -56,7 +56,12 @@ export async function run(config, client) {
     console.log("  no versions on this app");
     return true;
   }
-  const version = mine[0];
+  // Pick the version that is ACTUALLY in review, not merely the first one Apple returned. An app on two
+  // platforms has two 1.2 records, and `mine[0]` was whichever came back first: with iOS
+  // WAITING_FOR_REVIEW and macOS PREPARE_FOR_SUBMISSION, this reported "not submitted — nothing to
+  // withdraw" and exited 0, never looking at the submission it was asked to cancel. Silence is the worst
+  // possible answer here, because the operator walks away believing the withdrawal happened.
+  const version = mine.find((v) => WITHDRAWABLE[v.attributes.appStoreState]) || mine[0];
   const state = version.attributes.appStoreState;
   const label = `${version.attributes.versionString} (${state})`;
 

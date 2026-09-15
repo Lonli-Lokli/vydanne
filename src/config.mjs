@@ -50,6 +50,9 @@ export async function loadConfig(p) {
     primaryLocale: need("primaryLocale"),
     keyId: creds.keyId,
     issuerId: creds.issuerId,
+    // Carried through so CI can hand the .p8 over as an env var instead of writing it to disk.
+    keyContent: creds.keyContent,
+    keyPath: creds.keyPath,
     uiLocales: raw.uiLocales || [],
     // App code -> App Store locale, for codes Apple spells differently or does not know yet. Merged over
     // the built-in table rather than replacing it, so an app declares only its exceptions.

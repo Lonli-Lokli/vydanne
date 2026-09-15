@@ -359,7 +359,7 @@ export interface VydanneConfig {
 
 /** Thin ASC REST client (native fetch + ES256 JWT). */
 export declare class Client {
-  constructor(opts: { keyId: string; issuerId: string; dryRun?: boolean });
+  constructor(opts: { keyId: string; issuerId: string; keyPath?: string; keyContent?: string; dryRun?: boolean });
   token: string;
   appId?: string;
   app?: unknown;
@@ -420,7 +420,22 @@ export declare function runCommand(
 ): Promise<{ ok: boolean; planned: Array<{ method: string; path: string; attributes: Record<string, unknown> }> }>;
 
 export declare function loadConfig(path?: string): Promise<ResolvedConfig>;
-export declare function makeToken(opts: { keyId: string; issuerId: string; keyPath?: string }): string;
+/**
+ * App Store Connect JWT (ES256).
+ *
+ * The signing key comes from ONE of three places, in order: `keyContent` (the .p8 itself, raw PEM or
+ * base64 — what CI hands over, so no key is written to a runner's disk), `keyPath`, or the default
+ * `~/.appstoreconnect/private_keys/AuthKey_<keyId>.p8`.
+ */
+export declare function makeToken(opts: {
+  keyId: string;
+  issuerId: string;
+  keyPath?: string;
+  keyContent?: string;
+}): string;
+
+/** The .p8 text itself, from `keyContent` / `keyPath` / the default location. Throws if it is neither. */
+export declare function resolveKey(opts: { keyId?: string; keyPath?: string; keyContent?: string }): string;
 export declare function resolveLocales(uiCodes: string[], extra?: Record<string, string>): ResolvedLocales;
 export declare function toAsc(code: string, extra?: Record<string, string>): string | null;
 export declare const VALID: Set<string>;

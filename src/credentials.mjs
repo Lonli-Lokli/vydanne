@@ -155,6 +155,11 @@ export function resolveCredentials(raw = {}, cwd = process.cwd(), env = process.
   return {
     keyId: pick("ASC_KEY_ID", "keyId"),
     issuerId: pick("ASC_ISSUER_ID", "issuerId"),
+    // The signing key itself, for CI. A developer machine keeps the .p8 in ~/.appstoreconnect and needs
+    // neither of these; a runner has only environment variables, and without them every workflow had to
+    // write the key to disk itself just to satisfy vydanne's path convention.
+    keyContent: pick("ASC_KEY_CONTENT", "keyContent"),
+    keyPath: expandHome(pick("ASC_KEY_PATH", "keyPath"), home),
     playJsonKeyFile: expandHome(pick("PLAY_JSON_KEY_FILE", "playJsonKeyFile"), home),
     sources,
     warnings,

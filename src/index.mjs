@@ -13,7 +13,7 @@ export { PlayClient } from "./play/client.mjs";
 export { loadConfig, CONFIG_KEYS } from "./config.mjs";
 export { COMMANDS, PLAY_COMMANDS, COMMAND_NAMES } from "./registry.mjs";
 export { resolveLocales, toAsc, VALID, UI_TO_ASC } from "./locales.mjs";
-export { makeToken } from "./jwt.mjs";
+export { makeToken, resolveKey } from "./jwt.mjs";
 export { DEFAULT_SCREENSHOT_BASE, IOS_DEVICE, MAC_DEVICE, screenshotBase } from "./screenshots.mjs";
 export { DEFAULT_PLAY_IMAGES, PLAY_IMAGE_KIND, playImages } from "./play/images.mjs";
 
@@ -55,7 +55,7 @@ export async function runCommand(name, opts = {}) {
     return { ok: (await run(config, client)) !== false, planned: [] };
   }
 
-  const client = spec.client ? new Client({ keyId: config.keyId, issuerId: config.issuerId, dryRun }) : null;
+  const client = spec.client ? new Client({ keyId: config.keyId, issuerId: config.issuerId, keyPath: config.keyPath, keyContent: config.keyContent, dryRun }) : null;
   const { run } = await import(`./commands/${spec.mod}.mjs`);
   // altool authenticates on its own rather than through our JWT, so it needs the raw ids.
   const ok = await run(config, client, spec.credentials ? { keyId: config.keyId, issuerId: config.issuerId } : undefined);

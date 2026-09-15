@@ -21,8 +21,8 @@ const MUTATING = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 // fetched from the FULL list (get_edit filters out READY_FOR_REVIEW), and individual localization reads
 // (list endpoints return sparse/empty text).
 export class Client {
-  constructor({ keyId, issuerId, dryRun = false }) {
-    this.token = makeToken({ keyId, issuerId });
+  constructor({ keyId, issuerId, keyPath, keyContent, dryRun = false }) {
+    this.token = makeToken({ keyId, issuerId, keyPath, keyContent });
     /** No mutating request leaves this process. Set by bin/ for a write command without `--apply`. */
     this.dryRun = dryRun;
     /** What a real run WOULD have sent, in order — the dry-run report, and the count bin/ prints. */

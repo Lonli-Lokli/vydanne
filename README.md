@@ -105,6 +105,7 @@ committed. A keyId or issuerId found there is refused at load, with a warning te
 | Source | Use it for |
 |---|---|
 | `ASC_KEY_ID` / `ASC_ISSUER_ID` / `PLAY_JSON_KEY_FILE` in the environment | CI secrets, one-off overrides |
+| `ASC_KEY_CONTENT` (the .p8, raw or base64) or `ASC_KEY_PATH` | CI — signs without writing the key to disk |
 | the `.env` cascade in the repo | one app that needs a different account from the rest |
 | **the user config file** | **the default for every app you ship** — one account, many repos |
 

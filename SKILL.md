@@ -36,7 +36,7 @@ form does **not** exist; set `$env:VAR = "1"` first.
 **Auth resolves automatically — NEVER put credentials in the config.** That file is committed; vydanne
 refuses a keyId/issuerId found there and warns. The signing key stays at
 `~/.appstoreconnect/private_keys/AuthKey_<keyId>.p8`. The ids resolve highest-priority-first from: the
-environment (`ASC_KEY_ID` / `ASC_ISSUER_ID` / `PLAY_JSON_KEY_FILE`) → the **`.env` cascade** → the **user
+environment (`ASC_KEY_ID` / `ASC_ISSUER_ID` / `PLAY_JSON_KEY_FILE`, plus `ASC_KEY_CONTENT` or `ASC_KEY_PATH` for the signing key in CI) → the **`.env` cascade** → the **user
 config file**.
 
 The cascade is the standard one (dotenv-parsed, later file wins): `.env` → `.env.<mode>` → `.env.local` →

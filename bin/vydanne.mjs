@@ -48,11 +48,16 @@ try {
     row("ASC_KEY_ID", cr.keyId, "ASC_KEY_ID", cr.keyId);
     row("ASC_ISSUER_ID", cr.issuerId, "ASC_ISSUER_ID");
     row("PLAY_JSON_KEY_FILE", cr.playJsonKeyFile, "PLAY_JSON_KEY_FILE", cr.playJsonKeyFile);
-    if (cr.keyId) {
-      const p = path.join(os.homedir(), ".appstoreconnect", "private_keys", `AuthKey_${cr.keyId}.p8`);
+    // The key can now arrive three ways; say WHICH, because "missing" pointing at a path that CI was
+    // never going to have is the least useful thing this command could print on a 401.
+    if (cr.keyContent) {
+      console.log(`  \x1b[32m✓\x1b[0m ${"signing key".padEnd(20)} <inline> ${"".padEnd(17)}← ${cr.sources.ASC_KEY_CONTENT}`);
+    } else if (cr.keyId) {
+      const p = cr.keyPath || path.join(os.homedir(), ".appstoreconnect", "private_keys", `AuthKey_${cr.keyId}.p8`);
       console.log(existsSync(p)
         ? `  \x1b[32m✓\x1b[0m ${"signing key".padEnd(20)} ${p}`
-        : `  \x1b[31m✗\x1b[0m ${"signing key".padEnd(20)} \x1b[31mmissing\x1b[0m — ${p}`);
+        : `  \x1b[31m✗\x1b[0m ${"signing key".padEnd(20)} \x1b[31mmissing\x1b[0m — ${p}\n` +
+          `      in CI set ASC_KEY_CONTENT (the .p8, raw or base64) instead of writing this file`);
     }
     console.log(cr.userFile ? `\nuser config: ${cr.userFile}` : `\nuser config: none found. Looked in:\n${cr.candidates.map((c) => `  ${c}`).join("\n")}`);
     if (!cr.keyId || !cr.issuerId) {
@@ -88,7 +93,7 @@ try {
     const spec = COMMANDS[cmd];
     const { run } = await import(`../src/commands/${spec.mod}.mjs`);
     const dryRun = Boolean(spec.writes) && !apply;
-    const client = spec.client ? new Client({ keyId: cfg.keyId, issuerId: cfg.issuerId, dryRun }) : null;
+    const client = spec.client ? new Client({ keyId: cfg.keyId, issuerId: cfg.issuerId, keyPath: cfg.keyPath, keyContent: cfg.keyContent, dryRun }) : null;
     if (dryRun) console.log(yellow(`DRY RUN — '${cmd}' will not change App Store Connect. Add --apply to write.`));
     // altool authenticates on its own rather than through our JWT, so it needs the raw ids.
     const ok = await run(cfg, client, spec.credentials ? { keyId: cfg.keyId, issuerId: cfg.issuerId } : undefined);
@@ -153,6 +158,8 @@ usage: vydanne <command> [--apply] [--config vydanne.config.mjs]
   locales         UI -> ASC locale mapping + unsupported
   auth            which credentials resolved, and from where (masked) — run this on a 401
 credentials: env > .env cascade (.env, .env.<mode>, .env.local, .env.<mode>.local) > user config
+  CI: ASC_KEY_CONTENT carries the .p8 itself (raw or base64) so no key is written to the runner disk;
+  ASC_KEY_PATH points at one. Without either, the key is read from ~/.appstoreconnect/private_keys.
   (\$VYDANNE_CONFIG_HOME, %APPDATA%\\vydanne or \$XDG_CONFIG_HOME/vydanne, ~/.appstoreconnect).
   NEVER the committed vydanne.config.mjs — run \`vydanne auth\` to see what resolved.
 toggles: VYDANNE_SKIP_METADATA / VYDANNE_SKIP_SCREENSHOTS (fill), VYDANNE_REPLACE=1 (fill/previews:

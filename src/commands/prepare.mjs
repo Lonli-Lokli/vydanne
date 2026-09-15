@@ -54,10 +54,19 @@ async function versionsFor(client, platform) {
   return json.data || [];
 }
 
-/** The newest build, together with the marketing version its archive declares. */
-async function newestBuildWithVersion(client) {
+/**
+ * The newest build FOR THIS PLATFORM, together with the marketing version its archive declares.
+ *
+ * Filtered by platform, which it was not: an app shipping on iOS and the Mac App Store uploads a build
+ * to each, and the unfiltered query returned whichever went up last. Preparing MAC_OS then tried to
+ * attach an iOS build and Apple answered 409 — so the Mac version was left holding nothing, or an older
+ * build, purely because the iOS one was newer. The 409 made it visible; a same-platform mix-up would
+ * not have been.
+ */
+async function newestBuildWithVersion(client, platform) {
   const { json } = await client.get(
     `/v1/builds?filter[app]=${client.appId}&sort=-uploadedDate&limit=1` +
+      (platform ? `&filter[preReleaseVersion.platform]=${platform}` : "") +
       `&fields[builds]=version,processingState&include=preReleaseVersion` +
       `&fields[preReleaseVersions]=version`,
   );
@@ -218,7 +227,7 @@ export async function run(config, client) {
 async function prepareOne(config, client, platform) {
   console.log(green(`prepare → App Store version (${platform})`));
 
-  const { build, marketing } = await newestBuildWithVersion(client);
+  const { build, marketing } = await newestBuildWithVersion(client, platform);
   const target = process.env.VYDANNE_VERSION || marketing;
 
   if (!target) {

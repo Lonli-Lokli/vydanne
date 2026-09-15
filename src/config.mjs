@@ -50,8 +50,6 @@ export async function loadConfig(p) {
     primaryLocale: need("primaryLocale"),
     keyId: creds.keyId,
     issuerId: creds.issuerId,
-    // Carried through so CI can hand the .p8 over as an env var instead of writing it to disk.
-    keyContent: creds.keyContent,
     keyPath: creds.keyPath,
     uiLocales: raw.uiLocales || [],
     // App code -> App Store locale, for codes Apple spells differently or does not know yet. Merged over
@@ -140,5 +138,8 @@ export async function loadConfig(p) {
       : null,
   };
   c.resolvedLocales = resolveLocales(c.uiLocales, c.localeMap);
+  // The signing key rides along NON-ENUMERABLE, like it does on the credentials object: a config is
+  // exactly the kind of thing someone dumps while debugging, and a private key must not be in that dump.
+  Object.defineProperty(c, "keyContent", { value: creds.keyContent, enumerable: false, writable: false });
   return c;
 }

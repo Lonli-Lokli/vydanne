@@ -152,13 +152,18 @@ export function resolveCredentials(raw = {}, cwd = process.cwd(), env = process.
     return undefined;
   };
 
-  return {
+  // The signing key itself, for CI. A developer machine keeps the .p8 in ~/.appstoreconnect and needs
+  // neither of these; a runner has only environment variables, and without them every workflow had to
+  // write the key to disk itself just to satisfy vydanne's path convention.
+  //
+  // NON-ENUMERABLE, deliberately: a private key must not be one careless `console.log(creds)` or
+  // `JSON.stringify(config)` away from a CI log that the whole team can read. Explicit property access
+  // still works, which is the only way it is ever read; a spread or a dump cannot see it.
+  const keyContent = pick("ASC_KEY_CONTENT", "keyContent");
+
+  const out = {
     keyId: pick("ASC_KEY_ID", "keyId"),
     issuerId: pick("ASC_ISSUER_ID", "issuerId"),
-    // The signing key itself, for CI. A developer machine keeps the .p8 in ~/.appstoreconnect and needs
-    // neither of these; a runner has only environment variables, and without them every workflow had to
-    // write the key to disk itself just to satisfy vydanne's path convention.
-    keyContent: pick("ASC_KEY_CONTENT", "keyContent"),
     keyPath: expandHome(pick("ASC_KEY_PATH", "keyPath"), home),
     playJsonKeyFile: expandHome(pick("PLAY_JSON_KEY_FILE", "playJsonKeyFile"), home),
     sources,
@@ -166,4 +171,6 @@ export function resolveCredentials(raw = {}, cwd = process.cwd(), env = process.
     userFile,
     candidates: configCandidates(env, home),
   };
+  Object.defineProperty(out, "keyContent", { value: keyContent, enumerable: false, writable: false });
+  return out;
 }

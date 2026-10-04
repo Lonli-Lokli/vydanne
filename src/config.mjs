@@ -5,10 +5,11 @@ import { resolveLocales } from "./locales.mjs";
 import { resolveCredentials } from "./credentials.mjs";
 import { DEFAULT_SCREENSHOT_BASE } from "./screenshots.mjs";
 import { DEFAULT_PLAY_IMAGES } from "./play/images.mjs";
+import { normalizeMiddleware } from "./middleware.mjs";
 
 // The public config surface — the drift guards assert each key is documented (README/SKILL) and typed
 // (types/index.d.ts). Add a config knob → document + type it, or the guards fail before publish.
-export const CONFIG_KEYS = ["bundleId", "primaryLocale", "asc", "platforms", "uiLocales", "localeMap", "metadataDir", "screenshots", "rating", "ageRating", "categories", "contentRights", "privacy", "iaps", "previews", "export", "ios", "google", "accessibility", "bridge", "push", "reviewContact", "allowCrossStoreTerms", "buildNumberOffset"];
+export const CONFIG_KEYS = ["bundleId", "primaryLocale", "asc", "platforms", "uiLocales", "localeMap", "metadataDir", "screenshots", "rating", "ageRating", "categories", "contentRights", "privacy", "iaps", "previews", "export", "ios", "google", "accessibility", "bridge", "push", "reviewContact", "allowCrossStoreTerms", "buildNumberOffset", "middleware"];
 
 // One `vydanne.config.mjs` per app (ESM, like zdymak.config.mjs) — nothing hard-coded. Secrets stay out:
 // credentials resolve from the environment, a gitignored .env, or ~/.appstoreconnect/config.json (see
@@ -94,6 +95,9 @@ export async function loadConfig(p) {
     // tool cannot verify, so it is refused unless it is an integer and reported wherever it is
     // applied. 0 means the plain convention, which is every app that never had the accident.
     buildNumberOffset: integerOr("buildNumberOffset", raw.buildNumberOffset, 0),
+    // The consumer's own logic around every store command: `[(ctx, next) => …]` or `{ name, commands, stores, run }`.
+    // Validated HERE so a malformed entry fails at config load, not halfway through a release. See middleware.mjs.
+    middleware: normalizeMiddleware(raw.middleware, "vydanne"),
     // Terms the cross-store check must not flag for this app (see src/crossStore.mjs).
     allowCrossStoreTerms: raw.allowCrossStoreTerms || [],
     previews: raw.previews || null,

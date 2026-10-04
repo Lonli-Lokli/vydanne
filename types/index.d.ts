@@ -355,7 +355,61 @@ export interface VydanneConfig {
    * a wrong commit as confidently as a right one.
    */
   buildNumberOffset?: number;
+  /**
+   * The app's own logic around every store command, in the order given (the first is outermost). Each entry
+   * is a function `(ctx, next)` or an object `{ name, commands, stores, run }` that limits it. Code before
+   * `await next()` runs first and may refuse with `ctx.fail(reason)`; code after it sees the command's
+   * result. Not run for `auth`, `locales`, `version` or help. See the README, "Middleware".
+   */
+  middleware?: Middleware[];
 }
+
+/** What a middleware entry is handed. `config` is live: a change made before `next()` is seen by the command. */
+export interface MiddlewareContext {
+  tool: "vydanne";
+  version: string;
+  /** The command, e.g. `prerelease`. */
+  command: string;
+  store: Store;
+  /** `--apply` (or VYDANNE_COMMIT=1) was given: the command will write to the store. */
+  apply: boolean;
+  /** The command writes and `apply` is off, so it will only validate. */
+  dryRun: boolean;
+  /** The command is one that can write to a store at all. */
+  writes: boolean;
+  /** The command-line arguments after the command name; empty when run through `runCommand`. */
+  argv: string[];
+  config: ResolvedConfig;
+  cwd: string;
+  env: Record<string, string | undefined>;
+  log(...args: unknown[]): void;
+  warn(...args: unknown[]): void;
+  /** Refuse: stops the command, prints the reason and exits 1. */
+  fail(reason: string): never;
+}
+
+export type MiddlewareFunction = (ctx: MiddlewareContext, next: () => Promise<unknown>) => unknown;
+
+export interface MiddlewareObject {
+  /** Shown in messages; defaults to the function's own name. */
+  name?: string;
+  /** Run only for these commands. */
+  commands?: string | string[];
+  /** Run only for these stores. */
+  stores?: Store | Store[];
+  run: MiddlewareFunction;
+}
+
+export type Middleware = MiddlewareFunction | MiddlewareObject;
+
+/** Thrown by `ctx.fail`. The CLI prints it as a refusal and exits 1. */
+export declare class MiddlewareRefusal extends Error {
+  middleware: string;
+  reason: string;
+}
+
+export declare function normalizeMiddleware(list: unknown, tool?: string): Array<Required<Omit<MiddlewareObject, "commands" | "stores">> & { commands: string[] | null; stores: string[] | null }>;
+export declare function runMiddleware<T>(list: unknown, ctx: Record<string, unknown> & { tool: string; command: string }, final: () => Promise<T>): Promise<T>;
 
 /** Thin ASC REST client (native fetch + ES256 JWT). */
 export declare class Client {
@@ -416,6 +470,8 @@ export declare function runCommand(
     configPath?: string;
     store?: Store;
     apply?: boolean;
+    /** Shown to middleware as `ctx.argv`. */
+    argv?: string[];
   },
 ): Promise<{ ok: boolean; planned: Array<{ method: string; path: string; attributes: Record<string, unknown> }> }>;
 

@@ -397,6 +397,14 @@ It waits for the version to actually leave review before returning. Apple passes
 `CANCELING` first, and a command that returned there would send you straight into a `fill` that
 fails on a still-locked version.
 
+## `middleware` — the app's own logic around commands
+
+The config key `middleware` takes `(ctx, next)` functions or `{ name, commands, stores, run }` objects, first entry outermost.
+Before `await next()` an entry may refuse with `ctx.fail(reason)`; after it, it sees `{ ok, planned }`. It runs for every store
+command (CLI and `runCommand`), before any client exists, and not for `auth`/`locales`/`version`/help. Use it for a release
+gate or a notifier rather than a wrapper script, which a direct `vydanne prerelease --apply` bypasses. Full example: README,
+"Middleware". The same key exists in zdymak.
+
 ## `--apply` — writes are opt-in
 
 **Every store-mutating command is a DRY RUN without `--apply`**: `prepare` · `push` · `fill` ·

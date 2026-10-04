@@ -6,6 +6,7 @@ import { loadConfig } from "../src/config.mjs";
 import { Client } from "../src/client.mjs";
 import { COMMANDS, PLAY_COMMANDS } from "../src/registry.mjs";
 import { yellow } from "../src/util.mjs";
+import { runMiddleware } from "../src/middleware.mjs";
 
 const VERSION = JSON.parse(readFileSync(new URL("../package.json", import.meta.url))).version;
 
@@ -32,6 +33,12 @@ if (store !== "apple" && store !== "google") {
 // VYDANNE_COMMIT=1 stays as an alias so the existing `play:internal` / `play:closed` scripts in the games
 // keep working unchanged; `--apply` is what the docs teach.
 const apply = argv.includes("--apply") || process.env.VYDANNE_COMMIT === "1";
+
+// USER MIDDLEWARE (config `middleware`) wraps every STORE command. Not `auth`, `locales`, `version` or help: those
+// touch no store, so there is nothing for a release gate or a notifier to guard.
+const through = (cfg, execute, extra = {}) => runMiddleware(cfg.middleware, {
+  tool: "vydanne", version: VERSION, command: cmd, store, apply, argv, config: cfg, cwd: process.cwd(), env: process.env, ...extra,
+}, execute);
 
 try {
   if (["version", "-v", "--version"].includes(cmd)) {
@@ -81,31 +88,37 @@ try {
     const { PlayClient } = await import("../src/play/client.mjs");
     const spec = PLAY_COMMANDS[cmd];
     const dryRun = Boolean(spec.writes) && !apply;
-    // Play needs no request-level gate: every mutation happens inside an Edit, and an Edit that is never
-    // committed changes nothing. So a dry run here VALIDATES for real against Google, then discards.
-    const client = await PlayClient.create({ keyPath: cfg.google.serviceAccountKey, packageName: cfg.google.packageName, dryRun });
-    if (dryRun) console.log(yellow(`DRY RUN — '${cmd} --store google' validates against Play and discards the edit. Add --apply to commit.`));
-    const { run } = await import(`../src/play/commands/${spec.mod}.mjs`);
-    const ok = await run(cfg, client);
-    if (ok === false) process.exit(1);
+    // Middleware runs BEFORE the client exists, so a refusal costs no authentication and no Play request.
+    const result = await through(cfg, async () => {
+      // Play needs no request-level gate: every mutation happens inside an Edit, and an Edit that is never
+      // committed changes nothing. So a dry run here VALIDATES for real against Google, then discards.
+      const client = await PlayClient.create({ keyPath: cfg.google.serviceAccountKey, packageName: cfg.google.packageName, dryRun });
+      if (dryRun) console.log(yellow(`DRY RUN — '${cmd} --store google' validates against Play and discards the edit. Add --apply to commit.`));
+      const { run } = await import(`../src/play/commands/${spec.mod}.mjs`);
+      return { ok: (await run(cfg, client)) !== false, planned: [] };
+    }, { dryRun, writes: Boolean(spec.writes) });
+    if (result?.ok === false) process.exit(1);
   } else if (COMMANDS[cmd]) {
     const cfg = await loadConfig(cfgPath);
     const spec = COMMANDS[cmd];
     const { run } = await import(`../src/commands/${spec.mod}.mjs`);
     const dryRun = Boolean(spec.writes) && !apply;
-    const client = spec.client ? new Client({ keyId: cfg.keyId, issuerId: cfg.issuerId, keyPath: cfg.keyPath, keyContent: cfg.keyContent, dryRun }) : null;
-    if (dryRun) console.log(yellow(`DRY RUN — '${cmd}' will not change App Store Connect. Add --apply to write.`));
-    // altool authenticates on its own rather than through our JWT, so it needs the raw ids.
-    const ok = await run(cfg, client, spec.credentials ? { keyId: cfg.keyId, issuerId: cfg.issuerId } : undefined);
-    // The count is the point: "nothing happened" is not the same as "nothing would happen", and only the
-    // second one means the local state already matches the store.
-    if (dryRun && client) {
-      const n = client.planned.length;
-      console.log(yellow(n
-        ? `DRY RUN — ${n} store write(s) withheld. Re-run with --apply to perform them.`
-        : "DRY RUN — nothing to write; the store already matches local."));
-    }
-    if (ok === false) process.exit(1);
+    const result = await through(cfg, async () => {
+      const client = spec.client ? new Client({ keyId: cfg.keyId, issuerId: cfg.issuerId, keyPath: cfg.keyPath, keyContent: cfg.keyContent, dryRun }) : null;
+      if (dryRun) console.log(yellow(`DRY RUN — '${cmd}' will not change App Store Connect. Add --apply to write.`));
+      // altool authenticates on its own rather than through our JWT, so it needs the raw ids.
+      const ok = await run(cfg, client, spec.credentials ? { keyId: cfg.keyId, issuerId: cfg.issuerId } : undefined);
+      // The count is the point: "nothing happened" is not the same as "nothing would happen", and only the
+      // second one means the local state already matches the store.
+      if (dryRun && client) {
+        const n = client.planned.length;
+        console.log(yellow(n
+          ? `DRY RUN — ${n} store write(s) withheld. Re-run with --apply to perform them.`
+          : "DRY RUN — nothing to write; the store already matches local."));
+      }
+      return { ok: ok !== false, planned: client?.planned ?? [] };
+    }, { dryRun, writes: Boolean(spec.writes) });
+    if (result?.ok === false) process.exit(1);
   } else {
     console.error(usage());
     process.exit(1);

@@ -440,6 +440,46 @@ don't have to learn them the hard way.
 
 <br>
 
+## Middleware — your own checks around any command
+
+A release has rules that belong to your app, not to vydanne: "never upload a bundle that has not opened on the lowest
+Android we support", "tell the channel when a build reaches testers", "refuse a Friday". `middleware` in the config is
+where that logic goes, so you do not wrap the CLI in a script that someone can bypass by calling vydanne directly.
+
+```js
+// vydanne.config.mjs
+export default {
+  // …
+  middleware: [
+    // an object limits an entry to the commands and stores it names
+    {
+      name: "release-gate",
+      commands: ["prerelease"],
+      stores: ["google"],
+      async run(ctx, next) {
+        if (ctx.apply && !hasReceipt(ctx.config.google.aab)) ctx.fail("this bundle has not passed the legacy-device check");
+        const result = await next();          // the command itself
+        if (ctx.apply && result?.ok) await tell("build is with testers");
+        return result;                         // returning nothing keeps the command's own result
+      },
+    },
+    // a bare function runs for every store command
+    async (ctx, next) => { ctx.log(`${ctx.command} on ${ctx.store}`); return next(); },
+  ],
+};
+```
+
+The first entry is outermost. Before `await next()` you may refuse: `ctx.fail(reason)` stops the command, prints
+`refused by middleware release-gate: …` and exits 1, before any client exists, so a refusal costs no Play or App Store
+Connect request. After it you see the result (`{ ok, planned }`). An entry that never calls `next()` skips the command and
+says so. `ctx` carries `command`, `store`, `apply`, `dryRun`, `writes`, `argv`, `cwd`, `env`, `version`, and the live
+`config`: a change made before `next()` (a different `google.track`, say) is what the command sees.
+
+It wraps every store command, from the CLI and from `runCommand`. It does not wrap `auth`, `locales`, `version` or help, which
+touch no store. A malformed entry is an error when the config loads. Middleware runs with the full power of the file it
+lives in, so it is not a sandbox. The same `middleware` key, with the same semantics, is in
+[zdymak](https://github.com/Lonli-Lokli/zdymak), so a check written for one reads the same in the other.
+
 ## What vydanne will never do
 
 - **It never submits for review, and never ships to the public.** It *will* put a build in front of

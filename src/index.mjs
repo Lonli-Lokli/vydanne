@@ -4,13 +4,16 @@
 // filenames that nothing outside the package could resolve, because `exports` maps only ".". So a
 // consumer could see that `fill` existed and had no way to run it. `runCommand` is that missing half:
 // the same dispatch bin/ performs, minus the argv parsing and the process.exit.
+import { readFileSync } from "node:fs";
 import { Client } from "./client.mjs";
 import { loadConfig } from "./config.mjs";
+import { runMiddleware } from "./middleware.mjs";
 import { COMMANDS, PLAY_COMMANDS } from "./registry.mjs";
 
 export { Client } from "./client.mjs";
 export { PlayClient } from "./play/client.mjs";
 export { loadConfig, CONFIG_KEYS } from "./config.mjs";
+export { MiddlewareRefusal, normalizeMiddleware, runMiddleware } from "./middleware.mjs";
 export { COMMANDS, PLAY_COMMANDS, COMMAND_NAMES } from "./registry.mjs";
 export { resolveLocales, toAsc, VALID, UI_TO_ASC } from "./locales.mjs";
 export { makeToken, resolveKey } from "./jwt.mjs";
@@ -34,6 +37,7 @@ export { DEFAULT_PLAY_IMAGES, PLAY_IMAGE_KIND, playImages } from "./play/images.
  * @param {string} [opts.configPath] path to vydanne.config.mjs, when loading from disk
  * @param {"apple"|"google"} [opts.store]
  * @param {boolean} [opts.apply]     perform store writes (default false — dry run)
+ * @param {string[]} [opts.argv]     the command-line arguments to show middleware (default: none)
  */
 export async function runCommand(name, opts = {}) {
   const { store = "apple", apply = false, configPath } = opts;
@@ -49,15 +53,27 @@ export async function runCommand(name, opts = {}) {
   if (store === "google") {
     if (!config.google) throw new Error("vydanne: no `google` block in config — add packageName + a service-account key");
     if (!config.google.serviceAccountKey) throw new Error("vydanne: set PLAY_JSON_KEY_FILE (or google.serviceAccountKey) to the Play service-account JSON");
-    const { PlayClient } = await import("./play/client.mjs");
-    const client = await PlayClient.create({ keyPath: config.google.serviceAccountKey, packageName: config.google.packageName, dryRun });
-    const { run } = await import(`./play/commands/${spec.mod}.mjs`);
-    return { ok: (await run(config, client)) !== false, planned: [] };
   }
 
-  const client = spec.client ? new Client({ keyId: config.keyId, issuerId: config.issuerId, keyPath: config.keyPath, keyContent: config.keyContent, dryRun }) : null;
-  const { run } = await import(`./commands/${spec.mod}.mjs`);
-  // altool authenticates on its own rather than through our JWT, so it needs the raw ids.
-  const ok = await run(config, client, spec.credentials ? { keyId: config.keyId, issuerId: config.issuerId } : undefined);
-  return { ok: ok !== false, planned: client?.planned ?? [] };
+  // The same `middleware` the CLI runs, with the same context, so a gate written for one holds for the other.
+  // `argv` is empty here: a library caller has no command line.
+  const ctx = {
+    tool: "vydanne", version: VERSION, command: name, store, apply, dryRun, writes: Boolean(spec.writes),
+    argv: opts.argv ?? [], config, cwd: process.cwd(), env: process.env,
+  };
+  return runMiddleware(config.middleware, ctx, async () => {
+    if (store === "google") {
+      const { PlayClient } = await import("./play/client.mjs");
+      const client = await PlayClient.create({ keyPath: config.google.serviceAccountKey, packageName: config.google.packageName, dryRun });
+      const { run } = await import(`./play/commands/${spec.mod}.mjs`);
+      return { ok: (await run(config, client)) !== false, planned: [] };
+    }
+    const client = spec.client ? new Client({ keyId: config.keyId, issuerId: config.issuerId, keyPath: config.keyPath, keyContent: config.keyContent, dryRun }) : null;
+    const { run } = await import(`./commands/${spec.mod}.mjs`);
+    // altool authenticates on its own rather than through our JWT, so it needs the raw ids.
+    const ok = await run(config, client, spec.credentials ? { keyId: config.keyId, issuerId: config.issuerId } : undefined);
+    return { ok: ok !== false, planned: client?.planned ?? [] };
+  });
 }
+
+const VERSION = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;

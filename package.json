@@ -52,12 +52,13 @@
     "check:docs": "node scripts/check-docs.mjs",
     "check:types": "tsc --noEmit -p tsconfig.json && node scripts/check-types.mjs",
     "check:config": "node scripts/check-config.mjs",
-    "verify": "npm run check:docs && npm run check:types && npm run check:config && npm run check:middleware",
+    "verify": "npm run check:docs && npm run check:types && npm run check:config && npm run check:middleware && npm run check:release",
     "prepublishOnly": "npm run verify",
     "release:patch": "node scripts/release.mjs patch",
     "release:minor": "node scripts/release.mjs minor",
     "release:major": "node scripts/release.mjs major",
-    "check:middleware": "node --test scripts/middleware.test.mjs"
+    "check:middleware": "node --test scripts/middleware.test.mjs",
+    "check:release": "node --test scripts/release-from-tag.test.mjs"
   },
   "dependencies": {
     "dotenv": "^17.4.2",

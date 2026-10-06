@@ -243,7 +243,7 @@ already right. `VYDANNE_FLATTEN=1` reads a flat screenshot folder rather than pe
 | `appinfo` | Sets the App Store **category** and the **content-rights** answer — the two app-level facts that block *Add for Review* and belong to no single release. Declared as `categories` (Apple's ids: `GAMES`, `GAMES_PUZZLE` — never display names) and `contentRights: false` for an app that shows no third-party content. Left undeclared, `contentRights` is not written at all, so an answer already given in App Store Connect is never overwritten by a default nobody chose. |
 | `age-rating` | Sets the age rating. `rating: "4+"` needs nothing else; any higher rating is described feature-by-feature in `ageRating` and Apple computes the band from it. |
 | `review-contact` | Fills in the App Review contact details (who Apple calls if there's a problem). |
-| `accessibility` | Saves Accessibility Nutrition Labels from the `accessibility` block in your config. Stays a draft until your app is live. Refuses to run if you have not declared one — see below. |
+| `accessibility` | Saves Accessibility Nutrition Labels from the `accessibility` block in your config, creating the declaration for each device family the app ships on (`devices`; default iPhone + iPad for iOS, Mac for macOS) when Apple has none yet. Stays a draft until your app is live. Refuses to run if you have not declared one — see below. |
 | `privacy` | Prints the privacy answers to paste into Apple's website (Apple's privacy section has no API). |
 | `iap` | Checks your in-app purchase text fits, and can strip transparency from an image. |
 | `compliance` | Generates the US encryption self-classification PDF that Apple asks for. |

@@ -68,7 +68,8 @@ at the repo you have rather than reshaping the repo around the tool.
 is refused instead of defaulted — that is deliberate, and re-adding a default is the bug, not the fix:
 
 - **`accessibility`** — Accessibility Nutrition Labels. Declare every feature true/false from what was
-  actually verified. No block → the command errors.
+  actually verified. No block → the command errors. A family with no declaration at Apple yet is created
+  (`devices`, default IPHONE + IPAD for iOS and MAC for macOS; an iPhone-only app sets `["IPHONE"]`).
 - **`export.algorithms` + `export.statement`** — the cryptography inventory and statement in the US
   export-compliance PDF (`compliance`). Required when `export.encryption` is `"standard"`. Never invent
   these; ask what the app actually ships. `export.filed` stays **false** until the report has really

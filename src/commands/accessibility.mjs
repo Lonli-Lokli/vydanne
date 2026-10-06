@@ -18,6 +18,12 @@ import { green, yellow, red } from "../util.mjs";
  * Apple's platform caveats are still applied here, because they are facts about the platforms
  * rather than about any app: Larger Text does not exist on macOS and Voice Control does not exist
  * on watchOS, so those are forced false regardless of what an app claims.
+ *
+ * A declaration that does not exist yet is CREATED, for each device family the app ships on
+ * (`devices`, or IPHONE + IPAD for an iOS app and MAC for a macOS one). Apple holds none until
+ * someone makes one: this command used to update only the families it found, so on an app nobody
+ * had set up by hand it printed "no IPHONE declaration" for every family and reported success,
+ * and four of the portfolio's five apps had no labels at all (2026-10-05).
  */
 
 /** Config key -> the ASC attribute it sets. */
@@ -53,6 +59,16 @@ const EXAMPLE = `  accessibility: {
     audioDescriptions: false,
   },`;
 
+/** The device families an app ships on: `devices` when declared, else what its platforms imply. */
+export function familiesFor(config) {
+  if (Array.isArray(config.accessibility?.devices)) return config.accessibility.devices;
+  const platforms = config.platforms || ["IOS"];
+  return [
+    ...(platforms.includes("IOS") ? ["IPHONE", "IPAD"] : []),
+    ...(platforms.includes("MAC_OS") ? ["MAC"] : []),
+  ];
+}
+
 /** Turn the app's declaration into the attributes for one device family. */
 function attributesFor(declared, family) {
   const out = {};
@@ -74,9 +90,15 @@ export function validate(config) {
       EXAMPLE,
     ].join("\n");
   }
-  const unknown = Object.keys(declared).filter((k) => !(k in FEATURES));
+  const unknown = Object.keys(declared).filter((k) => !(k in FEATURES) && k !== "devices");
   if (unknown.length) {
     return `accessibility: unknown feature(s) ${unknown.join(", ")}. Known: ${Object.keys(FEATURES).join(", ")}`;
+  }
+  if ("devices" in declared) {
+    const families = Object.keys(UNAVAILABLE);
+    if (!Array.isArray(declared.devices) || !declared.devices.length || declared.devices.some((d) => !families.includes(d))) {
+      return `accessibility.devices: a non-empty list of ${families.join(", ")} (the families the app ships on).`;
+    }
   }
   const missing = Object.keys(FEATURES).filter((k) => typeof declared[k] !== "boolean");
   if (missing.length) {
@@ -100,11 +122,20 @@ export async function run(config, client) {
   await client.findApp(config.bundleId);
   const publish = process.env.VYDANNE_A11Y_PUBLISH === "1";
   const { json } = await client.get(`/v1/apps/${client.appId}/accessibilityDeclarations?limit=50`);
-  const decls = {};
-  for (const d of json.data || []) decls[d.attributes.deviceFamily] = d.id;
+  // Per family: the DRAFT to edit, and the PUBLISHED one it would replace. Apple refuses any change to a
+  // published declaration (409, "can only be modified while in a 'DRAFT' state"): a correction is a new
+  // draft, and publishing it replaces the old one. Found correcting Niva's Larger Text, 2026-10-05.
+  const drafts = {};
+  const published = {};
+  for (const d of json.data || []) {
+    const { deviceFamily, state } = d.attributes;
+    if (state === "DRAFT") drafts[deviceFamily] = d;
+    else if (state === "PUBLISHED") published[deviceFamily] = d;
+  }
 
   const claimed = Object.keys(FEATURES).filter((k) => declared[k]);
   console.log(`  declaring: ${claimed.length ? claimed.join(", ") : "(nothing)"}`);
+  const wanted = familiesFor(config);
 
   let gated = false;
   // A PATCH that Apple refuses is a claim that never reached the store. Both failure paths below used
@@ -113,20 +144,43 @@ export async function run(config, client) {
   // the other three); the verdict now travels out with the return.
   const failures = [];
   for (const family of Object.keys(UNAVAILABLE)) {
-    const id = decls[family];
-    // Not a failure: Apple only holds declarations for the families the app actually ships on.
-    if (!id) {
-      console.error(yellow(`  no ${family} declaration`));
+    let id = drafts[family]?.id;
+    const attributes = attributesFor(declared, family);
+    const live = published[family];
+    // A family the app does not ship on has nothing to declare, unless Apple already holds one for it.
+    if (!id && !live && !wanted.includes(family)) continue;
+    // Already what Apple shows, and no draft waiting: nothing to send.
+    if (!id && live && Object.entries(attributes).every(([k, v]) => live.attributes[k] === v)) {
+      console.log(green(`  ${family}: published labels already match`));
       continue;
     }
-    const attributes = attributesFor(declared, family);
-    const r = await client.patch(`/v1/accessibilityDeclarations/${id}`, {
-      data: { type: "accessibilityDeclarations", id, attributes },
-    });
-    if (r.status >= 300) {
-      console.error(red(`  ${family} draft ${r.status}`));
-      failures.push(`${family}: draft not saved (${r.status})`);
-      continue;
+    if (!id) {
+      const c = await client.post(`/v1/accessibilityDeclarations`, {
+        data: {
+          type: "accessibilityDeclarations",
+          attributes: { deviceFamily: family, ...attributes },
+          relationships: { app: { data: { type: "apps", id: client.appId } } },
+        },
+      });
+      if (c.status >= 300) {
+        const detail = c.json?.errors?.[0]?.detail || c.text?.slice(0, 200) || "";
+        console.error(red(`  ${family} create ${c.status} ${detail}`));
+        failures.push(`${family}: declaration not created (${c.status}${detail ? `: ${detail}` : ""})`);
+        continue;
+      }
+      id = c.json.data.id;
+      const what = live ? "draft to replace the published labels" : "declaration";
+      console.log(green(`  ${family}: ${what} ${c.dryRun ? "would be created" : "created"}`));
+    } else {
+      const r = await client.patch(`/v1/accessibilityDeclarations/${id}`, {
+        data: { type: "accessibilityDeclarations", id, attributes },
+      });
+      if (r.status >= 300) {
+        const detail = r.json?.errors?.[0]?.detail || r.text?.slice(0, 200) || "";
+        console.error(red(`  ${family} draft ${r.status} ${detail}`));
+        failures.push(`${family}: draft not saved (${r.status}${detail ? `: ${detail}` : ""})`);
+        continue;
+      }
     }
     if (publish) {
       const p = await client.patch(`/v1/accessibilityDeclarations/${id}`, {

@@ -124,6 +124,12 @@ export interface AccessibilityConfig {
   reducedMotion: boolean;
   captions: boolean;
   audioDescriptions: boolean;
+  /**
+   * The device families the app ships on. A missing declaration is created for each; one already at
+   * Apple is updated whatever this says. Default: IPHONE + IPAD for an iOS app, MAC for a macOS one,
+   * so an iPhone-only app sets `["IPHONE"]`.
+   */
+  devices?: Array<'IPHONE' | 'IPAD' | 'MAC' | 'APPLE_WATCH'>;
 }
 
 export interface IosConfig {

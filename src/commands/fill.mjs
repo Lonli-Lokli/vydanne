@@ -140,10 +140,24 @@ export async function run(config, client) {
           let il = infoLocs.find((l) => l.attributes.locale === code);
           if (!il) {
             const c = await client.post(`/v1/appInfoLocalizations`, { data: { type: "appInfoLocalizations", attributes: { locale: code, ...iattrs }, relationships: { appInfo: { data: { type: "appInfos", id: info.id } } } } });
-            il = c.json.data;
-            if (il) infoLocs.push(il);
-            else console.error(`  appInfo ${code}: create failed — ${JSON.stringify(c.json?.errors?.[0]?.detail || c.json)}`);
-          } else if (Object.keys(iattrs).length) {
+            if (c.json?.data) {
+              // Created WITH the name and subtitle, so there is nothing left to PATCH.
+              infoLocs.push(c.json.data);
+            } else {
+              // Creating a NEW locale's version localization (above) makes Apple add the app-info one by
+              // itself, carrying the primary locale's name, so the list read at the start is stale and
+              // the POST answers "already exists". Read it again and fall through to the PATCH:
+              // otherwise the new locale ships under the English name and the run reports success.
+              const fresh = (await client.get(`/v1/appInfos/${info.id}/appInfoLocalizations?limit=200`)).json.data || [];
+              il = fresh.find((l) => l.attributes.locale === code);
+              if (il) infoLocs.push(il);
+              else {
+                console.error(red(`    ✗ ${code} app-info: create failed — ${JSON.stringify(c.json?.errors?.[0]?.detail || c.json).slice(0, 160)}`));
+                failed++;
+              }
+            }
+          }
+          if (il && Object.keys(iattrs).length) {
             const r = await patchAttrs(client, `/v1/appInfoLocalizations/${il.id}`, "appInfoLocalizations", il.id, iattrs, `${code} app-info`);
             if (!r.ok) failed++;
             for (const d of r.dropped) dropped.add(d);

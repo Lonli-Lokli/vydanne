@@ -4,6 +4,7 @@ import { green, yellow, red } from "../util.mjs";
 import { VALID } from "../locales.mjs";
 import { md5 } from "../upload.mjs";
 import { localScreenshots, remoteScreenshots, compareShots, localScreenshotLocales } from "../screenshots.mjs";
+import { appStoreNotesFile } from "../notes.mjs";
 
 // [asc attribute, local metadata filename, isLongText]
 const VERSION_FIELDS = [
@@ -46,7 +47,10 @@ export async function run(config, client) {
     const presence = {}; // field -> { localOnly:[], remoteOnly:[] }  (systematic — aggregated, not per-locale)
     for (const code of localDirs) {
       const folder = path.join(config.metadataDir, code);
-      const readL = (f) => { const p = path.join(folder, `${f}.txt`); return fs.existsSync(p) ? norm(fs.readFileSync(p, "utf8")) : null; };
+      const fileOf = (f) => f === "release_notes"
+        ? appStoreNotesFile(folder, v.attributes.versionString)
+        : path.join(folder, `${f}.txt`);
+      const readL = (f) => { const p = fileOf(f); return p && fs.existsSync(p) ? norm(fs.readFileSync(p, "utf8")) : null; };
       const vl = verLocs.find((l) => l.attributes.locale === code);
       const il = infoLocs.find((l) => l.attributes.locale === code);
       const vAttrs = vl ? await client.localization(vl.id) : {};

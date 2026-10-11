@@ -34,6 +34,37 @@ export function readAabVersionCode(file) {
   }
 }
 
+/**
+ * Read the versionName ("1.3") out of an `.aab`, the same way: the marketing version the release notes
+ * can be named after (`changelogs/1.3.txt`), known before the build exists, unlike a versionCode derived
+ * from the commit count. Null when the bundle cannot be read.
+ */
+export function readAabVersionName(file) {
+  try {
+    const manifest = zipEntry(fs.readFileSync(file), "base/manifest/AndroidManifest.xml");
+    return manifest ? findStringAttribute(manifest, "versionName") : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Depth-first hunt for an XmlAttribute named [name] (field 2) whose raw value (field 3) is a string. */
+function findStringAttribute(buf, name) {
+  let fields;
+  try { fields = protoFields(buf); } catch { return null; }
+  const own = fields.find((f) => f.no === 2 && f.wire === 2);
+  if (own && own.bytes.toString("utf8") === name) {
+    const value = fields.find((f) => f.no === 3 && f.wire === 2)?.bytes.toString("utf8");
+    return value || null;
+  }
+  for (const f of fields) {
+    if (f.wire !== 2) continue;
+    const found = findStringAttribute(f.bytes, name);
+    if (found != null) return found;
+  }
+  return null;
+}
+
 /** Extract one entry from a ZIP buffer (stored or deflated), or null. */
 function zipEntry(buf, wanted) {
   // End-of-central-directory: scan back from the end (the record allows a trailing comment).

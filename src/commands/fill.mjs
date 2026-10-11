@@ -5,6 +5,7 @@ import { VALID } from "../locales.mjs";
 import { uploadAsset } from "../upload.mjs";
 import { reportCrossStore } from "../crossStore.mjs";
 import { deviceMap, screenshotBase, IMAGE_FILE } from "../screenshots.mjs";
+import { appStoreNotesFile } from "../notes.mjs";
 
 // Version-localization fields (attr -> metadata filename) and AppInfo fields (shared across releases).
 const VERSION_TXT = { description: "description", keywords: "keywords", promotionalText: "promotional_text", whatsNew: "release_notes", marketingUrl: "marketing_url", supportUrl: "support_url" };
@@ -108,7 +109,11 @@ export async function run(config, client) {
       if (strays.length) console.log(yellow(`  ${strays.length} folder(s) are not App Store locale codes, skipped: ${strays.join(", ")} (\`vydanne locales\` lists the valid ones)`));
       for (const code of dirs) {
         const folder = path.join(config.metadataDir, code);
-        const read = (f) => { const p = path.join(folder, `${f}.txt`); return fs.existsSync(p) ? fs.readFileSync(p, "utf8").replace(/\n+$/, "") : null; };
+        // "What's New" is named by the version being prepared when it can be (`release_notes/1.6.txt`).
+        const fileOf = (f) => f === "release_notes"
+          ? appStoreNotesFile(folder, v.attributes.versionString)
+          : path.join(folder, `${f}.txt`);
+        const read = (f) => { const p = fileOf(f); return p && fs.existsSync(p) ? fs.readFileSync(p, "utf8").replace(/\n+$/, "") : null; };
         // version localization (description/keywords/promo/whatsNew/urls)
         let vl = verLocs.find((l) => l.attributes.locale === code);
         if (!vl) {

@@ -386,8 +386,14 @@ wins:
 | File in `<metadataDir>/<play-locale>/changelogs/` | When to use it |
 |---|---|
 | `<versionCode>.txt` | You know the exact code (supply's own convention). |
+| `<versionName>.txt` | **This version's notes, e.g. `1.3.txt` — the one to write.** The marketing version is known before the build exists, every test build of that version shares the file, nothing is renamed after an upload, and the file's git history is exactly how this version's notes changed. The name is read from the bundle's own manifest, so it can never pick another version's file. |
 | `next.txt` | **The notes for the release you're about to cut** — for when the versionCode isn't knowable in advance (e.g. it's derived from the git commit count, so every commit moves it). After a real (`--apply`) publish, vydanne renames it to `<versionCode>.txt`, so the *next* release can't inherit this one's notes by accident. |
 | `default.txt` | Evergreen fallback ("bug fixes and improvements"). Falling back to it is **warned**, because notes written for one release quietly serving every later one is how a listing shows last release's news. |
+
+The App Store's "What's New" works the same way, keyed by the **App Store** version being prepared:
+`<locale>/release_notes/<version>.txt` (e.g. `release_notes/1.6.txt`) is used first by `fill` and `diff`, then
+the classic `release_notes.txt`. Each store keys its notes by its own marketing version, since an app's iOS and
+Android versions are independent.
 
 Notes are truncated to Play's 500-char cap with a warning. The versionCode comes from the bundle's own
 manifest — vydanne reads it out of the `.aab` locally and reports which changelog file each locale

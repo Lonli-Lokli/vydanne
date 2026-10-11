@@ -153,10 +153,12 @@ export interface GoogleConfig {
   /** `.aab` for `prerelease` — a file, or a directory whose NEWEST .aab is taken. Override: VYDANNE_AAB. */
   aab?: string;
   /**
-   * Testing track for `prerelease`. 'internal' (default), 'alpha', 'beta', or the name of any closed
+   * Testing track(s) for `prerelease`. 'internal' (default), 'alpha', 'beta', or the name of any closed
    * track you created in Play Console. Only 'production' is refused — that release is a human's.
+   * Several tracks, as an array or "alpha,internal", get the same bundle and notes in one edit, committed
+   * once, so they cannot drift apart. Override: VYDANNE_TRACK (a comma list too).
    */
-  track?: string;
+  track?: string | string[];
   /**
    * What state a new release is created in. Defaults to 'completed' — the rollout starts on upload.
    *

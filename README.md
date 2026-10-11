@@ -363,9 +363,15 @@ npx vydanne prerelease --store google --apply   # publish to the track
 google: {
   packageName: "com.x.app",
   aab: "./dist",        // a file, or a directory whose NEWEST .aab is taken
-  track: "internal",    // 'internal' (default) | 'alpha' | 'beta'
+  track: "internal",    // 'internal' (default) | 'alpha' | 'beta' | ["alpha", "internal"]
 }
 ```
+
+**Several tracks, one edit.** `track: ["alpha", "internal"]` (or `VYDANNE_TRACK=alpha,internal`) puts the same
+bundle and the same notes on every track named, inside one edit that is committed once: either every track has
+the build or none does. Two separate runs cannot promise that. The first archives `next.txt` as
+`<versionCode>.txt`, so the second has no notes of its own, and a build between them sends each track a
+different versionCode.
 
 **It refuses `production`** — that isn't a flag you can pass, it's a refusal. A staged rollout can be
 halted but never un-shipped, so promoting a tested build stays a human decision in Play Console. This is

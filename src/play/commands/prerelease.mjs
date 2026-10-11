@@ -2,19 +2,17 @@ import fs from "node:fs";
 import path from "node:path";
 import { green, yellow, red } from "../../util.mjs";
 import { readAabVersionCode } from "../aab.mjs";
+import { PRODUCTION, describeTracks, parseTracks } from "../tracks.mjs";
+
+// The one track this command refuses is PRODUCTION (../tracks.mjs). Everything else is passed through.
+//
+// `internal`, `alpha` and `beta` are Play's BUILT-IN track names, not the whole vocabulary: Play
+// Console encourages named closed tracks ("qa", "beta-partners"), and its API addresses them by that
+// name. A closed list rejected every one of them with "unknown track" — refusing a release for a
+// reason that was never true. The production refusal below is the one that matters, and it is exact.
 
 /**
- * The one track this command refuses. Everything else is passed through.
- *
- * `internal`, `alpha` and `beta` are Play's BUILT-IN track names, not the whole vocabulary: Play
- * Console encourages named closed tracks ("qa", "beta-partners"), and its API addresses them by that
- * name. A closed list rejected every one of them with "unknown track" — refusing a release for a
- * reason that was never true. The production refusal below is the one that matters, and it is exact.
- */
-const PRODUCTION = "production";
-
-/**
- * Upload an .aab to a CLOSED TESTING track, with release notes.
+ * Upload an .aab to one or more CLOSED TESTING tracks, with release notes.
  *
  * Why testing-only: shipping to everyone is a judgement call with no undo — a staged rollout can be
  * halted but not un-shipped, and the reviewer-facing consequences are the operator's to own. So this
@@ -28,30 +26,34 @@ const PRODUCTION = "production";
  * and re-uploading the same code fails loudly rather than silently replacing a binary.
  *
  * Everything happens inside one edit transaction: nothing is live until commit, and any throw leaves the
- * edit uncommitted — i.e. the track untouched.
+ * edit uncommitted — i.e. every track untouched. Several tracks (`google.track: ["alpha", "internal"]`,
+ * or VYDANNE_TRACK=alpha,internal) get the same bundle and the same notes in that one edit, so they
+ * cannot drift apart (../tracks.mjs says why two runs could).
  */
 export async function run(config, client) {
   const g = config.google;
-  const track = process.env.VYDANNE_TRACK || g.track || "internal";
+  const tracks = parseTracks(process.env.VYDANNE_TRACK || g.track || "internal");
 
-  if (track === PRODUCTION) {
+  if (tracks.includes(PRODUCTION)) {
     console.error(red("prerelease: refusing to write the production track — that release is a human's to make."));
     console.error("  Promote the tested build in Play Console when you're ready.");
     return false;
   }
   // Any other name is handed to Play, which knows its own tracks: a typo comes back as a 404 naming
   // the track, which is a better error than a list that was never authoritative.
-  if (!track) {
+  if (!tracks.length) {
     console.error(red("prerelease: no track — set `google.track` or VYDANNE_TRACK."));
     return false;
   }
+  const label = describeTracks(tracks);
+  const onTracks = `${tracks.length > 1 ? "tracks" : "track"} ${label}`;
 
   const aab = resolveAab(g.aab);
   if (!aab) {
     console.error(red("prerelease: no .aab found — set `google.aab` in the config, or pass VYDANNE_AAB=<path>."));
     return false;
   }
-  console.log(green(`prerelease → track "${track}"`));
+  console.log(green(`prerelease → ${onTracks}`));
   console.log(`  bundle: ${path.relative(process.cwd(), aab) || aab}  (${(fs.statSync(aab).size / 1e6).toFixed(1)} MB)`);
 
   // The bundle declares its own versionCode, so read it HERE — before the multi-megabyte upload — and
@@ -110,22 +112,25 @@ export async function run(config, client) {
     const name = process.env.VYDANNE_RELEASE_NAME;
     if (name) release.name = name;
 
-    const put = await client.putTrack(editId, track, [release]);
-    if (put.status >= 300) throw new Error(explainPlayError("tracks.update", put, track, status));
+    // The same release object on every track, inside the same edit: one commit makes them all live.
+    for (const track of tracks) {
+      const put = await client.putTrack(editId, track, [release]);
+      if (put.status >= 300) throw new Error(explainPlayError("tracks.update", put, `track "${track}"`, status));
+    }
 
     if (client.dryRun) {
       await client.deleteEdit(editId);
-      console.log(yellow(`\n  DRY RUN — edit discarded, nothing changed. Re-run with --apply to publish to "${track}".`));
+      console.log(yellow(`\n  DRY RUN — edit discarded, nothing changed. Re-run with --apply to publish to ${label}.`));
       return true;
     }
     const res = await client.commit(editId);
-    if (res.status >= 300) throw new Error(explainPlayError("edits.commit", res, track, status));
+    if (res.status >= 300) throw new Error(explainPlayError("edits.commit", res, onTracks, status));
     // "live" is only true of a release that has actually started. A draft one is uploaded and
     // waiting, and telling somebody it is live is how a build sits unnoticed for a week.
     console.log(
       status === "draft"
-        ? green(`\n  committed — versionCode ${versionCode} is on "${track}" as a DRAFT release.`)
-        : green(`\n  committed — versionCode ${versionCode} is live on "${track}".`),
+        ? green(`\n  committed — versionCode ${versionCode} is on ${label} as a DRAFT release.`)
+        : green(`\n  committed — versionCode ${versionCode} is live on ${label}.`),
     );
     if (status === "draft") {
       console.log(`  Nobody has it yet: open Play Console and start the rollout when you are ready.`);
@@ -248,7 +253,7 @@ const RELEASE_STATUSES = ["draft", "inProgress", "halted", "completed"];
  * `internal` and fails on `alpha` with a message that suggests nothing about tracks at all. The
  * fix is one setting, and it belongs in the error rather than in somebody's memory.
  */
-function explainPlayError(where, res, track, status) {
+function explainPlayError(where, res, onWhat, status) {
   const body = JSON.stringify(res.json).slice(0, 300);
   const message = res.json?.error?.message || "";
   if (/draft app/i.test(message)) {
@@ -256,7 +261,7 @@ function explainPlayError(where, res, track, status) {
       `${where} ${res.status}: ${message}`,
       "",
       `  This app has never been published, so Play calls it a draft app — and a draft app only`,
-      `  accepts releases whose status is "draft". You asked for "${status}" on track "${track}".`,
+      `  accepts releases whose status is "draft". You asked for "${status}" on ${onWhat}.`,
       "",
       `  Set it once in your config:      google: { releaseStatus: "draft" }`,
       `  Or for this run only:            VYDANNE_STATUS=draft`,

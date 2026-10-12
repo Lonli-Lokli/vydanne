@@ -127,6 +127,12 @@ screenshots is skipped** (and says so), never duplicated — `VYDANNE_REPLACE=1`
 and uploads yours, the same flag `previews` uses. PNGs must be **RGB with no alpha**, at a size the set
 takes, and at most **ten per set** — `bridge`, `preflight` and `fill` check both against Apple's catalog.
 
+**A store set with repeats is not in sync.** `diff` and `preflight` used to match the store's set to the
+folder by file name, so a set holding the same pictures twice read as clean: Vinto's 1.4, ready to
+submit, had nine pictures in a six-picture 6.9" set (and eight and seven in its other two). They count
+now ("local 6 / remote 9"). Run `preflight` before every submission, and fix a reported set with
+`VYDANNE_REPLACE=1 fill --apply`, which replaces the store's set rather than adding to it.
+
 **iPhone Duo** is one set for both screens: outer 1398×2034 / 2034×1398, inner 2007×2853 / 2853×2007
 (Apple's catalog has all four under one placement group, limit ten; the display type `APP_IPHONE_DUO` is
 not in the published OpenAPI but the live API creates it). Filename order is display order, so name

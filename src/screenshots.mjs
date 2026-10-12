@@ -104,8 +104,13 @@ export async function remoteScreenshots(client, locId) {
     const m = new Map();
     for (const ref of s.relationships?.appScreenshots?.data || []) {
       const a = shotsById.get(ref.id);
-      if (a) m.set(a.fileName, a.sourceFileChecksum ?? null);
-      else m.set(ref.id, null); // not included — treat as present but unverifiable
+      let key = a ? a.fileName : ref.id; // not included — treat as present but unverifiable
+      // The same name twice in one set is a duplicate on the store, and it has to COUNT. Keyed by name
+      // alone, the second copy overwrote the first: Vinto 1.4's 6.9" set held nine screenshots, three of
+      // them repeats, and `diff` and `preflight` both read it as the six local files and called it in sync.
+      // A suffixed key keeps the extra copy visible, so the comparison reports "local 6 / remote 9".
+      for (let n = 2; m.has(key); n++) key = `${a ? a.fileName : ref.id} (copy ${n})`;
+      m.set(key, a ? a.sourceFileChecksum ?? null : null);
     }
     remote[s.attributes.screenshotDisplayType] = m;
   }

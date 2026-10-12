@@ -167,8 +167,12 @@ into localized art, and a `<source>/<lang>/` subdirectory overrides the shared s
 `store-assets/<locale>/<dir>/NN-name.png` onto the Apple and Play paths above: locale codes via the
 same `toAsc` table `fill` uses (`de` → `de-DE`; a code with no App Store language is skipped and falls
 back to the primary listing), the device-slot prefix prepended (`iphone69_01-fresh.png`; zdymak's
-`appstore-iphone-duo-outer`/`-inner`/`-inner-landscape` merged into one `iphoneduo_` set, order set by
-`bridge.apple.iphoneduo: { dirs, order: "display" | "scene" }`), and the Play
+zdymak's four `appstore-iphone-duo-*` targets merged into one `iphoneduo_` set, order set by
+`bridge.apple.iphoneduo: { dirs, order: "display" | "scene" }`), the iOS 27 creative assets into
+`<creative.dir>/<locale>/header.*` / `search.*` (`appstore-header.png` or `appstore-universal.png` → header,
+`appstore-search.png` → search, per locale; a reel with `destination: 'appstore-header-video'` /
+`'appstore-search-video'` → the primary's header/search video, found via zdymak.config.mjs whatever it is
+named; two outputs for one slot refused until `bridge.creative.<slot>` names one), and the Play
 sets into their configured destinations. A locale with screenshots but NO listing text is held back
 (uploading pictures alone would create the localization and break its fallback to the primary
 language), and every bridged image is checked for an alpha channel — which Apple rejects — on the

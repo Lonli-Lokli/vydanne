@@ -110,8 +110,8 @@ test('bridge merges zdymak\'s outer and inner Duo targets into one set, outer fi
     'iphone69_01-home.png',
     'iphoneduo_1-outer_01-home.png',
     'iphoneduo_1-outer_02-table.png',
-    'iphoneduo_2-inner_01-home.png',
-    'iphoneduo_2-inner_02-table.png',
+    'iphoneduo_3-inner_01-home.png',
+    'iphoneduo_3-inner_02-table.png',
   ]);
   // What fill, diff and preflight then see: one APP_IPHONE_DUO set of four, in that order.
   const local = await inProject(dir, [], async () => localScreenshots('IOS', 'en-GB', config));

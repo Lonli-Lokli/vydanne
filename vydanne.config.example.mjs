@@ -86,6 +86,8 @@ export default {
   //     // "display" = all outer, then all inner (default); "scene" = interleaved scene by scene.
   //     iphoneduo: { dirs: ["appstore-iphone-duo-outer", "appstore-iphone-duo-inner"], order: "display" },
   //   },
+  //   // When zdymak renders a header image AND a header reel, the one to carry (where it exists).
+  //   creative: { header: "app-header.mp4" },
   //   play: { sevenInchScreenshots: "play-tablet7-plain" },
   // },
 

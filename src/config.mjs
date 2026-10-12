@@ -86,7 +86,7 @@ export async function loadConfig(p) {
     // default to zdymak's own conventions; both must be overridable, because `dir:` overrides in
     // zdymak.config.mjs mean the directory name and the target name are not the same thing.
     bridge: raw.bridge
-      ? { out: raw.bridge.out || null, apple: raw.bridge.apple || null, play: raw.bridge.play || null }
+      ? { out: raw.bridge.out || null, apple: raw.bridge.apple || null, play: raw.bridge.play || null, creative: raw.bridge.creative || null }
       : null,
     // `build number = git rev-list --count <commit> + buildNumberOffset`, for a repo that was
     // forced off the plain count and cannot get back — squash a long branch onto the release

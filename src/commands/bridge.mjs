@@ -4,7 +4,8 @@ import { pathToFileURL } from "node:url";
 import { green, yellow, red } from "../util.mjs";
 import { toAsc } from "../locales.mjs";
 import { IOS_DEVICE, MAC_DEVICE, screenshotBase, IMAGE_FILE } from "../screenshots.mjs";
-import { SNAPSHOT_CATALOG, mismatch, describeSize } from "../assetCatalog.mjs";
+import { SNAPSHOT_CATALOG, CREATIVE_SLOTS, mismatch, describeSize, matchFile } from "../assetCatalog.mjs";
+import { creativeBase } from "../creative.mjs";
 import { playImages } from "../play/images.mjs";
 
 /**
@@ -67,10 +68,14 @@ const APPLE_SLOTS = {
   //
   // `order` is a decision Apple has not documented: nothing published says how the App Store sequences
   // a mixed Duo set or which screen a folded phone shows first. "display" (all outer, then all inner,
-  // then inner landscape) is the default because the outer screen is the phone-shaped one and the first
-  // few shots are what search results show; "scene" interleaves them (01 outer, 01 inner, 02 outer …)
-  // for a gallery that pairs each screen with its unfolded twin. Overridable per app — `bridge.apple`.
-  iphoneduo: { dirs: ["appstore-iphone-duo-outer", "appstore-iphone-duo-inner", "appstore-iphone-duo-inner-landscape"], order: "display" },
+  // each upright before turned) is the default because the outer screen is the phone-shaped one and the
+  // first few shots are what search results show; "scene" interleaves them (01 outer, 01 inner, 02 outer
+  // …) for a gallery that pairs each screen with its unfolded twin. Overridable per app — `bridge.apple`.
+  // The four directories are zdymak's four Duo targets; whichever of them a config renders is carried.
+  iphoneduo: {
+    dirs: ["appstore-iphone-duo-outer", "appstore-iphone-duo-outer-landscape", "appstore-iphone-duo-inner", "appstore-iphone-duo-inner-landscape"],
+    order: "display",
+  },
   watch: "appstore-watch",
 };
 
@@ -129,6 +134,26 @@ const PLAY_SOURCES = {
   tvBanner: ["play-tv-banner.png"],
 };
 
+/**
+ * The iOS 27 product page header and search results asset -> the zdymak files that feed them, relative
+ * to a locale's output folder (or the root, for the untranslated set). zdymak writes its branded graphics
+ * as `<out>/[<locale>/][<dir>/]<target>.png` and its reels as `<out>/<reel name>.mp4` — reels are never
+ * localized, so a video only ever feeds the primary listing. A reel's name is the app's own choice
+ * (`vinto-header` is as likely as `appstore-header`), so the reels are found by the DESTINATION they
+ * declare in zdymak.config.mjs, and the conventional names below only cover a config that cannot be read.
+ *
+ * The universal graphic (one 5244×2950 PNG) is carried as the HEADER. Search results get it through
+ * `creative.searchFromHeader`, which places the same library asset in both slots — copying it to
+ * search.png as well would be a second file for `diff` to track that can only ever be the same bytes.
+ */
+const CREATIVE_SOURCES = {
+  header: { image: ["appstore-header.png", "appstore-universal.png"], video: ["appstore-header.mp4", "appstore-header-video.mp4"] },
+  search: { image: ["appstore-search.png"], video: ["appstore-search.mp4", "appstore-search-video.mp4"] },
+};
+const CREATIVE_TARGETS = { "appstore-header": "header", "appstore-universal": "header", "appstore-search": "search" };
+const CREATIVE_REELS = { "appstore-header-video": "header", "appstore-search-video": "search" };
+const VIDEO_FILE = /\.(mp4|m4v|mov)$/i;
+
 // A directory under `out` that is shaped like a locale code. Everything zdymak writes at that level is
 // either an output directory or a locale, and the old rule — "not a known target, therefore a locale" —
 // turned every `dir:` override into a phantom locale (`play-phone-plain`, `appstore-iphone-6.9-dark`)
@@ -147,7 +172,15 @@ const imagesIn = (p) => (fs.existsSync(p) ? fs.readdirSync(p).filter((f) => IMAG
  * anything other than its shape.
  */
 async function readZdymak(config) {
-  const out = { root: config.bridge?.out || "./store-assets", knownDirs: new Set(), fromConfig: false };
+  const out = {
+    root: config.bridge?.out || "./store-assets",
+    knownDirs: new Set(),
+    fromConfig: false,
+    // Creative slot -> { image: [relative path…], video: [file…] } that THIS config writes, beyond the
+    // conventional names; and whether it declares any creative output at all (which decides ownership).
+    creative: { header: { image: [], video: [] }, search: { image: [], video: [] } },
+    declaresCreative: false,
+  };
   const file = path.resolve("zdymak.config.mjs");
   if (!fs.existsSync(file)) return out;
   let cfg;
@@ -171,9 +204,49 @@ async function readZdymak(config) {
       // zdymak/src/screenshots.mjs. Both spellings are recorded so neither can be mistaken for a locale.
       out.knownDirs.add(s.dir || s.target);
       out.knownDirs.add(s.target);
+      const slot = CREATIVE_TARGETS[s.target];
+      if (slot) {
+        out.creative[slot].image.push(path.join(s.dir || "", `${s.target}.png`));
+        out.declaresCreative = true;
+      }
     }
   }
+  // Reels, named the way zdymak names them: `name`, else `reel` alone or `reel-<n>` among several.
+  const reels = (Array.isArray(cfg.reel) ? cfg.reel : cfg.reel ? [cfg.reel] : []).filter((r) => r?.segments?.length);
+  reels.forEach((r, i) => {
+    const name = r.name || (reels.length > 1 ? `reel-${i + 1}` : "reel");
+    const slot = CREATIVE_REELS[r.destination] || CREATIVE_REELS[name];
+    if (!slot) return;
+    out.creative[slot].video.push(`${name}.mp4`);
+    out.declaresCreative = true;
+  });
   return out;
+}
+
+/**
+ * Which files under one output folder feed each creative slot: `{ header: [abs…], search: [abs…] }`.
+ * More than one for a slot is a conflict the caller refuses — a placement holds one asset, and choosing
+ * between a header image and a header video on the app's behalf is how the wrong one ships.
+ *
+ * `bridge.creative.<slot>` names the file to carry (relative to the folder) when zdymak renders more than
+ * one — and only where it EXISTS. The usual case is a header video for the primary listing beside a
+ * header image in every locale: the video is not localized, so naming it must not cost the translated
+ * folders their own images. A folder without the named file falls back to the default rule.
+ */
+function creativeFiles(from, zd, config, { videos }) {
+  const present = (list) => [...new Set(list)]
+    .filter((c) => videos || !VIDEO_FILE.test(c))
+    .map((c) => path.join(from, c))
+    .filter((p) => fs.existsSync(p) && fs.statSync(p).isFile());
+  const found = {};
+  for (const slot of Object.keys(CREATIVE_SOURCES)) {
+    const override = config.bridge?.creative?.[slot];
+    const chosen = override ? present([override].flat()) : [];
+    found[slot] = chosen.length
+      ? chosen
+      : present([...CREATIVE_SOURCES[slot].image, ...zd.creative[slot].image, ...CREATIVE_SOURCES[slot].video, ...zd.creative[slot].video]);
+  }
+  return found;
 }
 
 /** First candidate directory that exists under `from`, or null. */
@@ -203,6 +276,7 @@ export async function run(config) {
 
   const APPLE = path.resolve(screenshotBase("IOS", config));
   const APPLE_MAC = path.resolve(screenshotBase("MAC_OS", config));
+  const CREATIVE = path.resolve(creativeBase(config));
 
   // ── PLAN FIRST, WRITE SECOND ────────────────────────────────────────────────────────────────────
   // Nothing below touches the disk. The old shape reset the destination at the top and discovered it
@@ -210,7 +284,9 @@ export async function run(config) {
   // and *then* reported failure, and a `--dry-run` could not check the files a real run would refuse
   // because they had not been copied yet. Planning first makes the dry run exact and the failure paths
   // non-destructive, at the cost of one array.
-  const plan = []; // { from, to, store: 'apple' | 'play' }
+  const plan = []; // { from, to, store: 'apple' | 'play' | 'creative' }
+  const creativeConflicts = [];
+  const creativeLocales = new Set();
   const noListing = [];
   const noLanguage = [];
   const ignored = [];
@@ -290,6 +366,20 @@ export async function run(config) {
         }
       }
     }
+
+    // The iOS 27 header and search asset, into `<creative.dir>/<locale>/header.<ext>` / `search.<ext>` —
+    // the layout `vydanne creative` reads. Held back with the screenshots above for a locale with no
+    // listing text, for the same reason and because `creative` places only on an existing localization.
+    const found = creativeFiles(from, zd, config, { videos: !source });
+    for (const [slot, files] of Object.entries(found)) {
+      if (files.length > 1) {
+        creativeConflicts.push(`${asc}: ${files.map((p) => path.relative(process.cwd(), p)).join(" and ")} — ${files.length === 2 ? "both" : "all"} for the ${CREATIVE_SLOTS[slot].label}, which holds one`);
+        continue;
+      }
+      if (!files.length) continue;
+      plan.push({ from: files[0], to: path.join(CREATIVE, asc, `${slot}${path.extname(files[0]).toLowerCase()}`), store: "creative", slot });
+      creativeLocales.add(asc);
+    }
   }
 
   // ── Play ────────────────────────────────────────────────────────────────────────────────────────
@@ -325,8 +415,18 @@ export async function run(config) {
 
   const appleCount = plan.filter((p) => p.store === "apple").length;
   const playCount = plan.filter((p) => p.store === "play").length;
+  const creativeCount = plan.filter((p) => p.store === "creative").length;
 
-  if (!appleCount && !playCount) {
+  if (creativeConflicts.length) {
+    console.error(red("bridge: more than one zdymak output for one creative slot:"));
+    for (const c of creativeConflicts) console.error(`  ${c}`);
+    console.error("  Drop one from zdymak.config.mjs, or name the one to carry, relative to its folder:");
+    console.error("  bridge: { creative: { header: \"<file>\" } }  (a folder without that file keeps the default rule)");
+    console.error("  Nothing was copied; every destination is untouched.");
+    return false;
+  }
+
+  if (!appleCount && !playCount && !creativeCount) {
     console.error(red("bridge: nothing was bridged — check that zdymak actually wrote store-assets."));
     if (ignored.length) console.error(`  neither a zdymak output nor a locale: ${ignored.join(", ")}`);
     console.error("  Nothing was removed; every destination is untouched.");
@@ -386,19 +486,41 @@ export async function run(config) {
     }
   }
 
+  // ── The creative assets, against the same catalog `vydanne creative` checks them with ────────────
+  // One function for both (assetCatalog.matchFile), so a file the bridge carries is a file `creative`
+  // will accept: size, format, alpha, and for a video its length, frame rate and sound.
+  const creativeBad = [];
+  for (const p of plan.filter((x) => x.store === "creative")) {
+    const { placementType, group } = CREATIVE_SLOTS[p.slot];
+    const m = await matchFile(p.from, SNAPSHOT_CATALOG.specsFor(placementType, group));
+    if (m.problem) creativeBad.push(`${path.relative(process.cwd(), p.from)} — ${m.problem}`);
+  }
+  if (creativeBad.length) {
+    console.error(red("bridge: these would be refused for their creative slot:"));
+    for (const p of creativeBad) console.error(`  ${p}`);
+    console.error("  Nothing was copied; every destination is untouched.");
+    return false;
+  }
+
   // ── Write ───────────────────────────────────────────────────────────────────────────────────────
   // Ownership is per STORE: producing any Apple output means the bridge owns both Apple roots, so the
   // macOS one is emptied even on a run that wrote nothing into it. An app that bridges only Play never
   // has its hand-managed Apple screenshots touched, and vice versa.
+  const mediaIn = (p) => (fs.existsSync(p) ? fs.readdirSync(p).filter((f) => IMAGE_FILE.test(f) || VIDEO_FILE.test(f)) : []);
   const countFiles = (root) => {
     if (!fs.existsSync(root)) return 0;
-    let n = imagesIn(root).length;
-    for (const d of dirsIn(root)) n += imagesIn(path.join(root, d)).length;
+    let n = mediaIn(root).length;
+    for (const d of dirsIn(root)) n += mediaIn(path.join(root, d)).length;
     return n;
   };
+  // The creative root is owned when zdymak produced a creative file this run, or is CONFIGURED to — the
+  // second half is what stops a header dropped upstream (its graphic or reel removed, its file left
+  // behind) from being placed forever. A project whose zdymak config declares no creative output at all
+  // keeps a hand-managed fastlane/creative untouched, whatever else the bridge carries.
   const owned = [
     ...(appleCount ? [APPLE, APPLE_MAC] : []),
     ...(playCount ? [...playDirs] : []),
+    ...(creativeCount || zd.declaresCreative ? [CREATIVE] : []),
   ];
   const removals = owned.map((root) => [root, countFiles(root)]).filter(([, n]) => n);
 
@@ -416,6 +538,20 @@ export async function run(config) {
   if (noLanguage.length) console.log(`    no App Store language, falls back to ${config.primaryLocale}: ${noLanguage.join(" ")}`);
   if (noListing.length) console.log(`    held back (screenshots ready, listing text missing): ${noListing.join(" ")}`);
 
+  console.log(`▸ Creative → ${path.relative(process.cwd(), CREATIVE)}`);
+  console.log(`    ${creativeCount} files · ${creativeLocales.size} locale(s)${creativeCount ? ` · ${plan.filter((p) => p.store === "creative").map((p) => path.relative(CREATIVE, p.to)).join(", ")}` : ""}`);
+  // A universal header with no search asset of its own reaches search results only through
+  // `creative.searchFromHeader` — said either way, so an empty search slot is never a surprise.
+  const universalOnly = [...creativeLocales].filter((asc) => {
+    const mine = plan.filter((p) => p.store === "creative" && path.basename(path.dirname(p.to)) === asc);
+    return mine.some((p) => p.slot === "header" && path.basename(p.from) === "appstore-universal.png") && !mine.some((p) => p.slot === "search");
+  });
+  if (universalOnly.length) {
+    console.log(config.creative?.searchFromHeader
+      ? `    universal header, placed in search results too by \`vydanne creative\` (searchFromHeader): ${universalOnly.join(" ")}`
+      : yellow(`    universal header with no search asset — set creative.searchFromHeader to place it there too: ${universalOnly.join(" ")}`));
+  }
+
   console.log(`▸ Play → ${[...playDirs].map((d) => path.relative(process.cwd(), d)).join(", ") || "nothing"}`);
   console.log(`    ${playCount} files · ${[...playCarried].join(", ") || "nothing"}`);
 
@@ -427,6 +563,6 @@ export async function run(config) {
   }
   if (ignored.length) console.log(yellow(`    ignored (neither a zdymak output nor a locale): ${ignored.join(", ")}`));
 
-  console.log(green(dryRun ? "✓ dry run — nothing written" : "✓ bridged — `vydanne fill` can now find every set"));
+  console.log(green(dryRun ? "✓ dry run — nothing written" : `✓ bridged — \`vydanne fill\`${creativeCount ? " and \`vydanne creative\`" : ""} can now find every set`));
   return true;
 }

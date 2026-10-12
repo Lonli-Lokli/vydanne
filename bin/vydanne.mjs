@@ -162,8 +162,9 @@ usage: vydanne <command> [--apply] [--config vydanne.config.mjs]
                   placed per localization. Optional; nothing to do without the files.
   iap             validate IAP fields; VYDANNE_FLATTEN=<png> flattens a screenshot to RGB
   compliance      generate the US encryption self-classification PDF
-  bridge          map zdymak's store-assets output onto the folders \`fill\` reads (locale codes,
-                  device prefixes, Play paths). Local files only; --dry-run previews.
+  bridge          map zdymak's store-assets output onto the folders \`fill\` and \`creative\` read
+                  (locale codes, device prefixes, the Duo set, header/search, Play paths). Local
+                  files only; --dry-run previews.
   inspect         read-only ASC state
   releases        every version ever shipped, with the build and the commit it came from —
                   and whether that commit is tagged. --store google: what each track serves

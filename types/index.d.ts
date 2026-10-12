@@ -205,7 +205,7 @@ export type PlayImageType =
  * renamed so `fill`'s filename order is the order asked for.
  */
 export interface MergedSlot {
-  /** Directory names, in rank order. Default for `iphoneduo`: the outer, inner and inner-landscape targets. */
+  /** Directory names, in rank order. Default for `iphoneduo`: zdymak's four Duo targets — outer, outer-landscape, inner, inner-landscape. */
   dirs: string[];
   /**
    * 'display' (default): every outer shot, then every inner one. 'scene': interleaved, scene by scene.
@@ -227,6 +227,13 @@ export interface BridgeConfig {
   apple?: Record<string, string | string[] | MergedSlot>;
   /** Play image type -> the zdymak output directory it comes from. Same shape and reason. */
   play?: Partial<Record<PlayImageType, string | string[]>>;
+  /**
+   * Creative slot -> the zdymak file(s) to carry into `<creative.dir>/<locale>/header.*` / `search.*`,
+   * relative to a locale's output folder. By default: `appstore-header.png` or `appstore-universal.png`
+   * (or a reel whose destination is `appstore-header-video`) for the header, `appstore-search.png` (or
+   * an `appstore-search-video` reel) for search. Needed only when zdymak renders more than one for a slot.
+   */
+  creative?: Partial<Record<"header" | "search", string | string[]>>;
 }
 
 /**

@@ -163,7 +163,7 @@ Every field is optional except `bundleId` and `primaryLocale`. The ones you reac
 | `ageRating` | The content descriptors behind any rating above `4+`. Apple computes the band from them. |
 | `reviewContact` | `{ demoAccountRequired }` — otherwise inferred from whether `review_information/demo_user.txt` exists. |
 | `export` | Export-compliance details. `algorithms` + `statement` are required for `encryption: "standard"`. |
-| `bridge` | `{ out, apple, play }` — which zdymak output folder feeds which store slot, when `dir:` overrides make them differ. `apple.iphoneduo: { dirs, order }` picks the Duo targets and their order. |
+| `bridge` | `{ out, apple, play, creative }` — which zdymak output folder feeds which store slot, when `dir:` overrides make them differ. `apple.iphoneduo: { dirs, order }` picks the Duo targets and their order; `creative.header` / `creative.search` name the file to carry when zdymak renders two for one slot. |
 | `creative` | `{ dir, searchFromHeader, poster }` — the iOS 27 product page header and search results asset. See [iOS 27](#ios-27-iphone-duo-and-the-product-page-header). |
 | `push` | `{ skip: [...] }` — pipeline steps this app never runs. |
 | `google` | The Play block, including `track`, `images` and `imageLocales`. |
@@ -250,7 +250,7 @@ already right. `VYDANNE_FLATTEN=1` reads a flat screenshot folder rather than pe
 | `privacy` | Prints the privacy answers to paste into Apple's website (Apple's privacy section has no API). |
 | `iap` | Checks your in-app purchase text fits, and can strip transparency from an image. |
 | `compliance` | Generates the US encryption self-classification PDF that Apple asks for. |
-| `bridge` | Moves [zdymak](https://github.com/Lonli-Lokli/zdymak)'s captured screenshots into the folders `fill` reads — renaming locales to the stores' codes and files to the device-slot convention. Local files only; `--dry-run` previews. Run it after every capture. |
+| `bridge` | Moves [zdymak](https://github.com/Lonli-Lokli/zdymak)'s captured screenshots into the folders `fill` reads, and its header and search graphics and reels into the folder `creative` reads — renaming locales to the stores' codes and files to the device-slot convention. Local files only; `--dry-run` previews. Run it after every capture. |
 | `version` | Prints the version of vydanne. |
 
 For **Google Play**, add `--store google` to `inspect`, `diff`, `preflight`, `fill`, or `prerelease`.
@@ -316,18 +316,19 @@ one placement group, `IPHONE_DUO_PROFILE`, with one limit of ten. The display ty
 published OpenAPI (4.5.1), so it rests on the live API rather than on the document.
 
 **The order is yours.** Apple has not said how the App Store sequences a mixed Duo set, so `bridge`
-makes it a setting. By default it carries zdymak's `appstore-iphone-duo-outer`, `-inner` and
-`-inner-landscape` targets, outer first:
+makes it a setting. By default it carries whichever of zdymak's four Duo targets were rendered —
+`appstore-iphone-duo-outer`, `-outer-landscape`, `-inner`, `-inner-landscape` — outer first:
 
 ```
 fastlane/screenshots/en-GB/iphoneduo_1-outer_01-home.png      ← "display" order (the default)
 fastlane/screenshots/en-GB/iphoneduo_1-outer_02-table.png
-fastlane/screenshots/en-GB/iphoneduo_2-inner_01-home.png
+fastlane/screenshots/en-GB/iphoneduo_3-inner_01-home.png
 ```
 
 `bridge: { apple: { iphoneduo: { dirs: [...], order: "scene" } } }` picks the directories and interleaves
-them instead (`iphoneduo_01-home_1-outer.png`, `iphoneduo_01-home_2-inner.png`, …). Three targets of six
-scenes is eighteen files for a set of ten, so `bridge` refuses that and names the fix. Managing the files
+them instead (`iphoneduo_01-home_1-outer.png`, `iphoneduo_01-home_2-inner.png`, …). More than ten files in
+all is refused, naming the fix — six outer and four inner, say, comes either from naming the two
+directories in `dirs`, or from a zdymak device for the inner screen whose own `scenes` stop at four. Managing the files
 by hand works the same way: anything named `iphoneduo_…` is the Duo set, uploaded in filename order.
 
 **Optional until April 2027.** Apple requires Duo screenshots from April 2027 for apps built with the
@@ -353,6 +354,15 @@ No alpha, anywhere. Those are the sizes in Apple's catalog on 2026-10-12; vydann
 live catalog whenever it has a client, so a change on Apple's side reaches it without a release. One
 disagreement to know about: Apple's help page lists JPEG for the 3840×1646 header, and the catalog
 takes PNG only for it. The catalog is what the upload is processed against, so vydanne follows it.
+
+From zdymak, `bridge` carries them: `appstore-header.png` (or `appstore-universal.png`, which becomes the
+header) and `appstore-search.png`, per locale, and a reel whose `destination` is `appstore-header-video` or
+`appstore-search-video` for the primary listing — found through `zdymak.config.mjs` whatever the reel is
+called. Each file is checked against the same catalog `creative` uses before anything is copied. Two
+outputs for one slot (a header image AND a header reel) are refused until `bridge.creative.header` names
+the one to carry; a folder without that file keeps the default, so naming the primary's reel does not cost
+the translated listings their own images. Like the screenshot folders, `fastlane/creative` is rebuilt on
+each run that produces creative assets, or whose zdymak config declares any.
 
 `vydanne creative` validates every file first and refuses the whole run on one bad file, then uploads each
 distinct file **once** into the app's App Asset Library and places it on each localization. The library

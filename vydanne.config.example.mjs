@@ -50,6 +50,11 @@ export default {
     { platform: "IOS", type: "IPHONE_67", file: "marketing/out/appstore-preview.mp4", poster: "00:00:05:00", locales: ["en-GB", "en-US"] },
   ],
 
+  // The iOS 27 product page header and search results asset (`vydanne creative`), both optional. One file
+  // per slot per locale: <dir>/<ASC-locale>/header.png|.mp4 and search.png|.jpg|.mp4. A 5244×2950 PNG is a
+  // universal asset; searchFromHeader places it in search results too for a locale with no search file.
+  // creative: { dir: "fastlane/creative", searchFromHeader: true, poster: "00:00:02:00" },
+
   // Export compliance. `algorithms` and `statement` are REQUIRED when encryption is "standard" — this
   // generates a US export-compliance PDF that makes factual claims, so it will not guess them for you.
   // `filed` stays false until you have actually emailed the report to BIS and the NSA; while it is
@@ -75,7 +80,12 @@ export default {
   // target name (e.g. Play's 7" slot, which can only exist as `{ target: 'play-tablet', dir: … }`).
   // bridge: {
   //   out: "./store-assets",
-  //   apple: { iphone69: "appstore-iphone-6.9" },
+  //   apple: {
+  //     iphone69: "appstore-iphone-6.9",
+  //     // iPhone Duo: several zdymak targets merged into ONE store set (ten files at most), in this order.
+  //     // "display" = all outer, then all inner (default); "scene" = interleaved scene by scene.
+  //     iphoneduo: { dirs: ["appstore-iphone-duo-outer", "appstore-iphone-duo-inner"], order: "display" },
+  //   },
   //   play: { sevenInchScreenshots: "play-tablet7-plain" },
   // },
 

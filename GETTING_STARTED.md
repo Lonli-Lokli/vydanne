@@ -230,6 +230,7 @@ export default {
 | `privacy` | What data actually leaves the device, e.g. `{ collected: ["CRASH_DATA"], tracking: false }`. |
 | `iaps` | Your in-app purchases (name ≤30 chars, description ≤45). |
 | `previews` | App Preview videos — see step 7. |
+| `creative` | Optional `{ dir, searchFromHeader, poster }` — the iOS 27 product page header and search results image or video. Files go in `fastlane/creative/<locale>/header.png` and `search.png` (or `.mp4`); `vydanne creative` places them. |
 | `export` | Export-compliance details for the PDF: `{ encryption, appName, version, teamId, algorithms, statement, filed }`. `algorithms` and `statement` are **required** when `encryption` is `"standard"` — the command will not invent your cryptography. |
 | `google` | The Play block — `{ packageName, metadataDir, defaultLocale, track, images, imageLocales }`. Omit it if you're iOS-only. |
 | `bridge` | Optional `{ out, apple, play }` — where zdymak wrote, and which of its output folders feed which store slot. Only needed when `dir:` in `zdymak.config.mjs` makes a folder name differ from its target name. |
@@ -291,6 +292,7 @@ image is for. Anything after it is yours — but files upload in alphabetical or
 | `iphone69_` | iPhone 6.9″ |
 | `iphone65_` | iPhone 6.5″ |
 | `ipad13_` | iPad Pro 12.9″ |
+| `iphoneduo_` | iPhone Duo — outer and inner screen in ONE set of up to ten, shown in filename order |
 | `watch_` | Apple Watch Ultra |
 | `macos_` | Mac (in `screenshots-macos/`) |
 
@@ -366,8 +368,8 @@ separate ANSSI declaration.
 would make and sends nothing. So the safe rhythm is always: run it, read the plan, run it again with
 `--apply`.
 
-The whole Apple release is one command, which runs the seven steps in the only order that works
-(`prepare` → `fill` → `previews` → `age-rating` → `review-contact` → `accessibility` → `preflight`) and
+The whole Apple release is one command, which runs the eight steps in the only order that works
+(`prepare` → `fill` → `previews` → `creative` → `age-rating` → `review-contact` → `accessibility` → `preflight`) and
 stops at the first problem:
 
 ```sh

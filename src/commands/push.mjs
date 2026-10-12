@@ -2,6 +2,7 @@ import { green, yellow, red } from "../util.mjs";
 import { run as prepare } from "./prepare.mjs";
 import { run as fill } from "./fill.mjs";
 import { run as previews } from "./previews.mjs";
+import { run as creative } from "./creative.mjs";
 import { run as ageRating } from "./ageRating.mjs";
 import { run as reviewContact } from "./reviewContact.mjs";
 import { run as accessibility } from "./accessibility.mjs";
@@ -10,7 +11,7 @@ import { run as preflight } from "./preflight.mjs";
 /**
  * The whole Apple release pipeline, in the one order that works.
  *
- * WHY A COMMAND AND NOT A PARAGRAPH. Shipping an update takes seven commands in a specific order —
+ * WHY A COMMAND AND NOT A PARAGRAPH. Shipping an update takes eight commands in a specific order —
  * `prepare` first (or nothing has a version to write into), `preflight` last (or green is measured
  * before the writes it is meant to bless) — and that ordering lived in nobody's head. The near-miss
  * that proved it: with the order forgotten, `fill` was pointed at an app whose only version was ON
@@ -45,6 +46,9 @@ const STEPS = [
   ["prepare", prepare],
   ["fill", fill],
   ["previews", previews],
+  // After previews, for the same reason they follow fill: placements need the localizations fill creates.
+  // An app with no header or search asset passes straight through it — both slots are optional.
+  ["creative", creative],
   ["age-rating", ageRating],
   ["review-contact", reviewContact],
   ["accessibility", accessibility],

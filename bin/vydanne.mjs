@@ -140,12 +140,13 @@ usage: vydanne <command> [--apply] [--config vydanne.config.mjs]
                   Run this FIRST on an app that already has a version on sale — until it has,
                   there is no draft for \`fill\` to write into. Never submits; VYDANNE_VERSION=<x>
                   to name the version instead of reading it off the newest build.
-✎ push            the whole pipeline, in order: prepare → fill → previews → age-rating →
+✎ push            the whole pipeline, in order: prepare → fill → previews → creative → age-rating →
                   review-contact → accessibility → preflight. Stops at the first failure.
                   --skip <step>[,<step>] drops steps that don't apply (prepare/preflight can't be
                   skipped); every skip is reported again at the end, so green still means green.
                   Ends at a green preflight — Add to Review + Submit stay yours, in the web UI.
-✎ fill            metadata + screenshots + previews (native; iOS & macOS separate)
+✎ fill            metadata + screenshots + previews (native; iOS & macOS separate). iphoneduo_*
+                  files are the iPhone Duo set: outer and inner screens in ONE set of ten.
 ✎ appinfo         App Store category + the content-rights answer — the two app-level facts that
                   block Add for Review and belong to no single release. 'categories' takes Apple's
                   ids (GAMES, GAMES_PUZZLE — not display names); 'contentRights: false' for an app
@@ -155,6 +156,10 @@ usage: vydanne <command> [--apply] [--config vydanne.config.mjs]
 ✎ accessibility   Accessibility Nutrition Labels (draft; VYDANNE_A11Y_PUBLISH=1 to publish once live)
   privacy         write the record + print the ASC-UI answers (API can't reach iris)
 ✎ previews        upload App Preview videos (native chunked upload)
+✎ creative        the iOS 27 product page header + search results asset, from
+                  <creative.dir>/<locale>/header.* and search.* (default fastlane/creative):
+                  checked against Apple's live catalog, uploaded once into the Asset Library,
+                  placed per localization. Optional; nothing to do without the files.
   iap             validate IAP fields; VYDANNE_FLATTEN=<png> flattens a screenshot to RGB
   compliance      generate the US encryption self-classification PDF
   bridge          map zdymak's store-assets output onto the folders \`fill\` reads (locale codes,
@@ -175,8 +180,9 @@ credentials: env > .env cascade (.env, .env.<mode>, .env.local, .env.<mode>.loca
   ASC_KEY_PATH points at one. Without either, the key is read from ~/.appstoreconnect/private_keys.
   (\$VYDANNE_CONFIG_HOME, %APPDATA%\\vydanne or \$XDG_CONFIG_HOME/vydanne, ~/.appstoreconnect).
   NEVER the committed vydanne.config.mjs — run \`vydanne auth\` to see what resolved.
-toggles: VYDANNE_SKIP_METADATA / VYDANNE_SKIP_SCREENSHOTS (fill), VYDANNE_REPLACE=1 (fill/previews:
-         replace populated slots), VYDANNE_VERSION (prepare), VYDANNE_A11Y_PUBLISH (accessibility),
+toggles: VYDANNE_SKIP_METADATA / VYDANNE_SKIP_SCREENSHOTS (fill), VYDANNE_REPLACE=1 (fill/previews/
+         creative: replace populated slots), VYDANNE_VERSION (prepare), VYDANNE_A11Y_PUBLISH (accessibility),
+         VYDANNE_DUO_OPTIONAL=1 (preflight, from April 2027: this build is on an SDK older than iOS 27.1),
          VYDANNE_PROFILE (named profile), VYDANNE_ENV (.env mode),
          VYDANNE_COMMIT=1 (legacy alias for --apply — prefer the flag)`;
 }

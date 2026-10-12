@@ -163,7 +163,8 @@ Every field is optional except `bundleId` and `primaryLocale`. The ones you reac
 | `ageRating` | The content descriptors behind any rating above `4+`. Apple computes the band from them. |
 | `reviewContact` | `{ demoAccountRequired }` — otherwise inferred from whether `review_information/demo_user.txt` exists. |
 | `export` | Export-compliance details. `algorithms` + `statement` are required for `encryption: "standard"`. |
-| `bridge` | `{ out, apple, play }` — which zdymak output folder feeds which store slot, when `dir:` overrides make them differ. |
+| `bridge` | `{ out, apple, play }` — which zdymak output folder feeds which store slot, when `dir:` overrides make them differ. `apple.iphoneduo: { dirs, order }` picks the Duo targets and their order. |
+| `creative` | `{ dir, searchFromHeader, poster }` — the iOS 27 product page header and search results asset. See [iOS 27](#ios-27-iphone-duo-and-the-product-page-header). |
 | `push` | `{ skip: [...] }` — pipeline steps this app never runs. |
 | `google` | The Play block, including `track`, `images` and `imageLocales`. |
 
@@ -202,7 +203,7 @@ DRY RUN — 40 store write(s) withheld. Re-run with --apply to perform them.
 ```
 
 The commands this applies to are marked `✎` in the usage text (`vydanne` with no arguments): `prepare`, `push`, `fill`, `previews`,
-`appinfo`, `age-rating`, `review-contact`, `accessibility`, `prerelease`. Everything else only reads, and ignores
+`creative`, `appinfo`, `age-rating`, `review-contact`, `accessibility`, `prerelease`. Everything else only reads, and ignores
 the flag.
 
 Two details worth knowing:
@@ -220,7 +221,8 @@ Two details worth knowing:
 > `VYDANNE_COMMIT=1` still works as an alias so existing Play scripts keep running, but prefer the flag.
 
 `fill` takes four more overrides, all off by default: `VYDANNE_REPLACE=1` replaces a store screenshot
-set instead of leaving the live one alone (what you want after re-rendering them), and
+set instead of leaving the live one alone (what you want after re-rendering them; `previews` and `creative`
+read the same flag), and
 `VYDANNE_SKIP_METADATA=1` / `VYDANNE_SKIP_SCREENSHOTS=1` do one half of the job when the other is
 already right. `VYDANNE_FLATTEN=1` reads a flat screenshot folder rather than per-locale ones.
 
@@ -230,13 +232,14 @@ already right. `VYDANNE_FLATTEN=1` reads a flat screenshot folder rather than pe
 
 | Command | In plain English |
 |---|---|
-| `preflight` | **Run this first.** Checks the listing is complete, nothing is over a character limit, no locale mentions the other app store — and that the screenshots on the store are your *current* ones, not a stale set. It also asserts the fields no local file drives and that no diff can therefore see: copyright, the App Review contact, the age rating, the primary category and the content-rights declaration. Those are each set by their own command, so a listing that never ran one had them EMPTY while this printed green. Green means submittable. Also refuses a **blank screenshot** — a file with almost no distinct colours in the middle of the frame, i.e. one where the app drew nothing. |
+| `preflight` | **Run this first.** Checks the listing is complete, nothing is over a character limit, no locale mentions the other app store — and that the screenshots on the store are your *current* ones, not a stale set. It also asserts the fields no local file drives and that no diff can therefore see: copyright, the App Review contact, the age rating, the primary category and the content-rights declaration. Those are each set by their own command, so a listing that never ran one had them EMPTY while this printed green. Green means submittable. Also refuses a **blank screenshot** — a file with almost no distinct colours in the middle of the frame, i.e. one where the app drew nothing — a screenshot of a size its set does not take, and a set with more files than Apple allows (ten), both judged against Apple's own catalog. Notes, without blocking, an iPhone listing with no **iPhone Duo** set (optional until April 2027) and empty **header / search** slots; a local header or search asset the store does not show is a blocker. |
 | `prepare` | Starts the next release: creates the App Store version you're preparing and attaches your newest build to it. **Needed before `fill` on an app that already has a version on sale** — until a draft exists there is nothing for the listing text to go into. Reuses the draft if it's already there, so it's safe to re-run. It does *not* submit. |
-| `push` | **The whole release, one command**: runs `prepare` → `fill` → `previews` → `age-rating` → `review-contact` → `accessibility` → `preflight`, in that order, stopping at the first failure. Dry run without `--apply`, like everything else. Ends at a green preflight — it never submits. |
-| `diff` | Shows exactly what's different between your files and what's live. Nothing is changed — a safe preview. |
-| `fill` | Uploads your listing text and screenshots. Handles iPhone, iPad and Mac. Refuses to upload text that names the other mobile platform. |
+| `push` | **The whole release, one command**: runs `prepare` → `fill` → `previews` → `creative` → `age-rating` → `review-contact` → `accessibility` → `preflight`, in that order, stopping at the first failure. Dry run without `--apply`, like everything else. Ends at a green preflight — it never submits. |
+| `diff` | Shows exactly what's different between your files and what's live — text, screenshots and previews by checksum, and the header / search assets by the checksum `creative` records. Nothing is changed — a safe preview. |
+| `fill` | Uploads your listing text and screenshots. Handles iPhone (including the iPhone Duo set), iPad and Mac. Refuses to upload text that names the other mobile platform, and a screenshot set with more files than Apple allows. |
 | `previews` | Uploads App Preview videos. |
-| `inspect` | Shows the app's current state in the store. Read-only. With `--store google` it also lists every track carrying a release — track, versionCode, version name, status, and the rollout percentage of a staged release. |
+| `creative` | Places the iOS 27 **product page header** and **search results** asset on the version being prepared, per localization — through Apple's App Asset Library, the only part of the API those slots exist in. Optional; nothing to do without the files. See [iOS 27](#ios-27-iphone-duo-and-the-product-page-header). |
+| `inspect` | Shows the app's current state in the store, including the iPhone Duo set and what the header and search slots show. Read-only. With `--store google` it also lists every track carrying a release — track, versionCode, version name, status, and the rollout percentage of a staged release. |
 | `releases` | Every version this app has ever had, with the build each one shipped, the commit that build number resolves to, and whether that commit is tagged. Read-only. `inspect` cannot answer this — it reports the version in preparation or the live one and nothing behind them. With `--store google` it reports what each track is serving; Play keeps no history of superseded releases, so tag as you release. |
 | `withdraw` | Takes a version back **out of** App Store review so it can be edited — the step `prepare` and `prerelease` both tell you to do by hand. Refuses a **live** version, exactly as `prerelease --store google` refuses the production track: it retrieves what is waiting and never touches what customers have. Undoes a submission; never makes one. Dry run without `--apply`. |
 | `locales` | Lists your languages and Apple's code for each — and warns about any language the App Store doesn't offer. |
@@ -252,12 +255,12 @@ already right. `VYDANNE_FLATTEN=1` reads a flat screenshot folder rather than pe
 
 For **Google Play**, add `--store google` to `inspect`, `diff`, `preflight`, `fill`, or `prerelease`.
 
-`prepare`, `push`, `fill`, `previews`, `appinfo`, `age-rating`, `review-contact`, `accessibility` and `prerelease`
+`prepare`, `push`, `fill`, `previews`, `creative`, `appinfo`, `age-rating`, `review-contact`, `accessibility` and `prerelease`
 change the store, so they need [`--apply`](#--apply-or-nothing-happens); without it they report and exit.
 
 ## The release pipeline — the order matters
 
-A release is the same seven steps in the same order, every time. `prepare` must come first (until the
+A release is the same eight steps in the same order, every time. `prepare` must come first (until the
 draft version exists, nothing has anywhere to write) and `preflight` must come last (green has to be
 measured *after* the writes it blesses, or it blesses nothing). That ordering is exactly the kind of
 thing that lives in someone's head until the day it doesn't — so `push` runs it for you, stopping at the
@@ -266,7 +269,7 @@ first failure, and each step's own refusals still apply:
 ```sh
 npx vydanne prerelease --apply    # whenever the build is ready — before or after push is fine
 npx vydanne push                  # DRY RUN of the whole pipeline: read the plan
-npx vydanne push --apply          # do it: prepare → fill → previews → age-rating
+npx vydanne push --apply          # do it: prepare → fill → previews → creative → age-rating
                                   #        → review-contact → accessibility → preflight
 # then, in App Store Connect: Add to Review -> Submit  (always you, never vydanne)
 ```
@@ -293,6 +296,84 @@ VYDANNE_VERSION=1.2 npx vydanne prepare --apply
 
 Prefer doing it step by step? Every step is its own command (the table above), and `push` is nothing
 more than those commands in the right order.
+
+<br>
+
+## iOS 27: iPhone Duo and the product page header
+
+Apple added three things to the App Store listing with iOS 27. vydanne handles all three; here is what
+each is, where its files go, and what the evidence for each decision is (checked 2026-10-12).
+
+### iPhone Duo screenshots
+
+**One set, both screens.** Files named `iphoneduo_*` go to `APP_IPHONE_DUO`, a single set of up to ten
+that holds the outer screen (1398×2034 or 2034×1398) and the inner one (2007×2853 or 2853×2007)
+together. The evidence: the live API creates a screenshot set with `APP_IPHONE_DUO` (HTTP 201) and a
+1398×2034 and 2034×1398 capture uploaded into it processed and showed in App Store Connect's Duo
+gallery ([App-Store-Connect-CLI#2926](https://github.com/rorkai/App-Store-Connect-CLI/pull/2926),
+2026-10-06); and Apple's own asset catalog (`GET /v1/appAssetLibraryRefData`) lists all four sizes under
+one placement group, `IPHONE_DUO_PROFILE`, with one limit of ten. The display type is missing from Apple's
+published OpenAPI (4.5.1), so it rests on the live API rather than on the document.
+
+**The order is yours.** Apple has not said how the App Store sequences a mixed Duo set, so `bridge`
+makes it a setting. By default it carries zdymak's `appstore-iphone-duo-outer`, `-inner` and
+`-inner-landscape` targets, outer first:
+
+```
+fastlane/screenshots/en-GB/iphoneduo_1-outer_01-home.png      ← "display" order (the default)
+fastlane/screenshots/en-GB/iphoneduo_1-outer_02-table.png
+fastlane/screenshots/en-GB/iphoneduo_2-inner_01-home.png
+```
+
+`bridge: { apple: { iphoneduo: { dirs: [...], order: "scene" } } }` picks the directories and interleaves
+them instead (`iphoneduo_01-home_1-outer.png`, `iphoneduo_01-home_2-inner.png`, …). Three targets of six
+scenes is eighteen files for a set of ten, so `bridge` refuses that and names the fix. Managing the files
+by hand works the same way: anything named `iphoneduo_…` is the Duo set, uploaded in filename order.
+
+**Optional until April 2027.** Apple requires Duo screenshots from April 2027 for apps built with the
+iOS 27.1 SDK or later. Until then `preflight` notes a missing Duo set on an iPhone listing; from then on it
+is a blocker, unless the build is on an older SDK (`VYDANNE_DUO_OPTIONAL=1`, because vydanne cannot see
+which SDK a build used).
+
+### Product page header and search results asset
+
+Two optional slots per localization, shown on iOS and iPadOS 27 and later. One file each:
+
+```
+fastlane/creative/en-GB/header.png    ← or header.mp4 / .mov / .m4v
+fastlane/creative/en-GB/search.png    ← or search.jpg / .mp4 / …
+```
+
+| Slot | Image | Video |
+|---|---|---|
+| Header | 5244×2950 PNG (universal: fits search too) or 3840×1646 PNG | 3840×1646, 30 or 60 fps, 5–30 s |
+| Search results | 5244×2950 PNG (universal) or 3:2 from 1920×1280 to 3840×2560, PNG or JPEG | 3:2, same range, 30 or 60 fps, 5–30 s |
+
+No alpha, anywhere. Those are the sizes in Apple's catalog on 2026-10-12; vydanne checks against the
+live catalog whenever it has a client, so a change on Apple's side reaches it without a release. One
+disagreement to know about: Apple's help page lists JPEG for the 3840×1646 header, and the catalog
+takes PNG only for it. The catalog is what the upload is processed against, so vydanne follows it.
+
+`vydanne creative` validates every file first and refuses the whole run on one bad file, then uploads each
+distinct file **once** into the app's App Asset Library and places it on each localization. The library
+keeps no checksum, so vydanne writes the file's md5 into the asset's reference name; that is how `diff`
+and `preflight` compare the store with your folder, and how a re-run places the asset it already uploaded
+instead of uploading it again. `creative: { searchFromHeader: true }` puts a universal header in search
+results too, for a locale with no `search.*`.
+
+**What stays in App Store Connect.** Placements can only be added to a version being prepared, so the
+assets go to review with that version. Two routes have no API yet, and `creative` prints them when it
+cannot proceed: submitting library assets for review on their own, and publishing an approved asset onto
+the version already on sale (*Product Page Information → Header and Search Results → Browse Assets →
+Publish*).
+
+### The App Asset Library, and what is deprecated
+
+App Store Connect API 4.5.1 introduced the App Asset Library and **deprecated the screenshot-set and
+app-preview-set resources** `fill` and `previews` use. They still work, Apple migrated every existing set
+into the library (each screenshot is now also a placement), and `fill` keeps using them because they
+carry the checksum `diff` compares by. `creative` uses the library because the header and search slots
+exist nowhere else. Moving screenshots and previews to the library is a later change.
 
 <br>
 
@@ -449,6 +530,8 @@ don't have to learn them the hard way.
 | In-app purchases need **two** different images, easily confused | Labels both slots |
 | Play's language codes differ from Apple's | Documented and validated separately |
 | A missing local screenshot folder deleting your live ones | Only uploads what exists — never deletes by omission |
+| A screenshot one size off, or an eleventh in a set of ten — refused after the first ten are already up | `bridge`, `preflight` and `fill` check both against Apple's own catalog first |
+| iPhone Duo's two screens look like two slots, but Apple holds them in one set of ten | One `iphoneduo_` set; `bridge` merges zdymak's outer and inner targets in an order you choose |
 
 <br>
 

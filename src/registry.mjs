@@ -14,8 +14,8 @@ export const COMMANDS = {
   // listing order: on an app with a version already on sale, `fill` has nothing valid to target
   // until this has run once.
   prepare: { mod: "prepare", client: true, writes: true },
-  // The pipeline in its one working order — prepare → fill → previews → age-rating → review-contact →
-  // accessibility → preflight — because that order lived in nobody's head, and a release nearly got
+  // The pipeline in its one working order — prepare → fill → previews → creative → age-rating →
+  // review-contact → accessibility → preflight — because that order lived in nobody's head, and a release nearly got
   // written to a live listing while everyone re-derived it. Stops at the first failure; never submits.
   push: { mod: "push", client: true, writes: true },
   fill: { mod: "fill", client: true, writes: true },
@@ -25,6 +25,9 @@ export const COMMANDS = {
   accessibility: { mod: "accessibility", client: true, writes: true },
   privacy: { mod: "privacy", client: false },
   previews: { mod: "previews", client: true, writes: true },
+  // The iOS 27 product page header and search results asset, through the App Asset Library — the only
+  // part of the API those two slots exist in. Optional, per localization, and a no-op without local files.
+  creative: { mod: "creative", client: true, writes: true },
   iap: { mod: "iap", client: false },
   compliance: { mod: "compliance", client: false },
   // Maps zdymak's output layout onto the folders `fill` reads. Local files only (like privacy and

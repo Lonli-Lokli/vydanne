@@ -9,7 +9,7 @@ import { normalizeMiddleware } from "./middleware.mjs";
 
 // The public config surface — the drift guards assert each key is documented (README/SKILL) and typed
 // (types/index.d.ts). Add a config knob → document + type it, or the guards fail before publish.
-export const CONFIG_KEYS = ["bundleId", "primaryLocale", "asc", "platforms", "uiLocales", "localeMap", "metadataDir", "screenshots", "rating", "ageRating", "categories", "contentRights", "privacy", "iaps", "previews", "export", "ios", "google", "accessibility", "bridge", "push", "reviewContact", "allowCrossStoreTerms", "buildNumberOffset", "middleware"];
+export const CONFIG_KEYS = ["bundleId", "primaryLocale", "asc", "platforms", "uiLocales", "localeMap", "metadataDir", "screenshots", "rating", "ageRating", "categories", "contentRights", "privacy", "iaps", "previews", "creative", "export", "ios", "google", "accessibility", "bridge", "push", "reviewContact", "allowCrossStoreTerms", "buildNumberOffset", "middleware"];
 
 // One `vydanne.config.mjs` per app (ESM, like zdymak.config.mjs) — nothing hard-coded. Secrets stay out:
 // credentials resolve from the environment, a gitignored .env, or ~/.appstoreconnect/config.json (see
@@ -101,6 +101,13 @@ export async function loadConfig(p) {
     // Terms the cross-store check must not flag for this app (see src/crossStore.mjs).
     allowCrossStoreTerms: raw.allowCrossStoreTerms || [],
     previews: raw.previews || null,
+    // The iOS 27 product page header and search results asset (`creative`). `dir` holds one folder per
+    // App Store locale with header.* / search.* in it; `searchFromHeader` reuses a universal header in
+    // search results; `poster` is a video's preview frame. Null means the defaults, which place nothing
+    // until files exist — both slots are optional.
+    creative: raw.creative
+      ? { dir: raw.creative.dir || null, searchFromHeader: raw.creative.searchFromHeader === true, poster: raw.creative.poster || null }
+      : null,
     export: raw.export || { encryption: "standard" },
     // What the app claims to support, for the Accessibility Nutrition Labels. Passed through RAW and
     // deliberately NOT defaulted: `accessibility` validates its own block and must be able to tell

@@ -1,0 +1,1028 @@
+{
+  "features": [
+    {
+      "featureId": "APP_STORE_VERSIONS",
+      "placementPolicies": [
+        {
+          "placementType": "APP_SCREENSHOT",
+          "groupLimits": [
+            {
+              "groupIds": [
+                "MAC_PROFILE",
+                "WATCH_ULTRA_PROFILE",
+                "IPHONE_DYNAMIC_ISLAND_LARGE_PROFILE",
+                "IPHONE_FACE_ID_LARGE_PROFILE",
+                "IPAD_13_PROFILE",
+                "IPHONE_DUO_PROFILE"
+              ],
+              "maxCount": 10
+            }
+          ]
+        },
+        {
+          "placementType": "PRODUCT_PAGE_HEADER_ASSET",
+          "groupLimits": [
+            {
+              "groupIds": [
+                "DEFAULT_PROFILE"
+              ],
+              "maxCount": 1
+            }
+          ]
+        },
+        {
+          "placementType": "APP_STORE_SEARCH_RESULTS_ASSET",
+          "groupLimits": [
+            {
+              "groupIds": [
+                "DEFAULT_PROFILE"
+              ],
+              "maxCount": 1
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "placementProfileGroups": [
+    {
+      "placementProfileGroupId": "MAC_PROFILE",
+      "platform": "MAC_APP_STORE",
+      "displayClassId": "DEFAULT"
+    },
+    {
+      "placementProfileGroupId": "WATCH_ULTRA_PROFILE",
+      "platform": "WATCH_APP_STORE",
+      "displayClassId": "WATCH_ULTRA"
+    },
+    {
+      "placementProfileGroupId": "IPHONE_DYNAMIC_ISLAND_LARGE_PROFILE",
+      "platform": "IPHONE_APP_STORE",
+      "displayClassId": "IPHONE_DYNAMIC_ISLAND_LARGE_DISPLAY"
+    },
+    {
+      "placementProfileGroupId": "IPHONE_FACE_ID_LARGE_PROFILE",
+      "platform": "IPHONE_APP_STORE",
+      "displayClassId": "IPHONE_FACE_ID_LARGE_DISPLAY"
+    },
+    {
+      "placementProfileGroupId": "IPAD_13_PROFILE",
+      "platform": "IPAD_APP_STORE",
+      "displayClassId": "IPAD_13_DISPLAY"
+    },
+    {
+      "placementProfileGroupId": "IPHONE_DUO_PROFILE",
+      "platform": "IPHONE_APP_STORE",
+      "displayClassId": "IPHONE_DUO"
+    },
+    {
+      "placementProfileGroupId": "DEFAULT_PROFILE",
+      "platform": "ANY",
+      "displayClassId": "DEFAULT"
+    }
+  ],
+  "imageSpecs": [
+    {
+      "specId": "d2ffa3b7-6c55-5cdf-8512-229d92791333",
+      "shortName": "i3x2w1920~3840a0",
+      "dimensions": {
+        "minWidth": 1920,
+        "maxWidth": 3840,
+        "minHeight": 1280,
+        "maxHeight": 2560
+      },
+      "aspectRatio": "3:2",
+      "compatiblePlacementTypes": [
+        "APP_STORE_SEARCH_RESULTS_ASSET"
+      ],
+      "alphaAllowed": false,
+      "fileExtensions": [
+        ".jpg",
+        ".jpeg",
+        ".png"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "image/jpeg",
+        "image/png"
+      ],
+      "universalAsset": false
+    },
+    {
+      "specId": "c8f4e2b1-7a3d-5c9e-8b6f-2d1a0e9c8b7a",
+      "shortName": "i5244x2950a0",
+      "dimensions": {
+        "minWidth": 5244,
+        "maxWidth": 5244,
+        "minHeight": 2950,
+        "maxHeight": 2950
+      },
+      "aspectRatio": "16:9",
+      "compatiblePlacementTypes": [
+        "APP_STORE_SEARCH_RESULTS_ASSET",
+        "PRODUCT_PAGE_HEADER_ASSET"
+      ],
+      "alphaAllowed": false,
+      "fileExtensions": [
+        ".png"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "image/png"
+      ],
+      "universalAsset": true
+    },
+    {
+      "specId": "1eb43b80-e0b7-4d96-bd32-47a42a8c5fed",
+      "shortName": "i3840x1646a0",
+      "dimensions": {
+        "minWidth": 3840,
+        "maxWidth": 3840,
+        "minHeight": 1646,
+        "maxHeight": 1646
+      },
+      "aspectRatio": "21:9",
+      "compatiblePlacementTypes": [
+        "PRODUCT_PAGE_HEADER_ASSET"
+      ],
+      "alphaAllowed": false,
+      "fileExtensions": [
+        ".png"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "image/png"
+      ],
+      "universalAsset": false
+    },
+    {
+      "specId": "e00744ec-5f5d-5017-b97a-84f5c761c2b7",
+      "shortName": "i2796x1290a0",
+      "dimensions": {
+        "minWidth": 2796,
+        "maxWidth": 2796,
+        "minHeight": 1290,
+        "maxHeight": 1290
+      },
+      "aspectRatio": "13:6",
+      "compatiblePlacementTypes": [
+        "APP_SCREENSHOT",
+        "IMESSAGE_APP_SCREENSHOT"
+      ],
+      "alphaAllowed": false,
+      "fileExtensions": [
+        ".jpg",
+        ".jpeg",
+        ".png"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "image/jpeg",
+        "image/png"
+      ],
+      "universalAsset": false
+    },
+    {
+      "specId": "f56c777c-99ea-5760-97ae-27c5f8cbb884",
+      "shortName": "i1290x2796a0",
+      "dimensions": {
+        "minWidth": 1290,
+        "maxWidth": 1290,
+        "minHeight": 2796,
+        "maxHeight": 2796
+      },
+      "aspectRatio": "6:13",
+      "compatiblePlacementTypes": [
+        "APP_SCREENSHOT",
+        "IMESSAGE_APP_SCREENSHOT"
+      ],
+      "alphaAllowed": false,
+      "fileExtensions": [
+        ".jpg",
+        ".jpeg",
+        ".png"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "image/jpeg",
+        "image/png"
+      ],
+      "universalAsset": false
+    },
+    {
+      "specId": "38e4b05b-3e42-563f-83ed-58f9ac76069e",
+      "shortName": "i2868x1320a0",
+      "dimensions": {
+        "minWidth": 2868,
+        "maxWidth": 2868,
+        "minHeight": 1320,
+        "maxHeight": 1320
+      },
+      "aspectRatio": "13:6",
+      "compatiblePlacementTypes": [
+        "APP_SCREENSHOT",
+        "IMESSAGE_APP_SCREENSHOT"
+      ],
+      "alphaAllowed": false,
+      "fileExtensions": [
+        ".jpg",
+        ".jpeg",
+        ".png"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "image/jpeg",
+        "image/png"
+      ],
+      "universalAsset": false
+    },
+    {
+      "specId": "bd402f1a-26ee-5b83-9dd7-972c60c43d47",
+      "shortName": "i1320x2868a0",
+      "dimensions": {
+        "minWidth": 1320,
+        "maxWidth": 1320,
+        "minHeight": 2868,
+        "maxHeight": 2868
+      },
+      "aspectRatio": "6:13",
+      "compatiblePlacementTypes": [
+        "APP_SCREENSHOT",
+        "IMESSAGE_APP_SCREENSHOT"
+      ],
+      "alphaAllowed": false,
+      "fileExtensions": [
+        ".jpg",
+        ".jpeg",
+        ".png"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "image/jpeg",
+        "image/png"
+      ],
+      "universalAsset": false
+    },
+    {
+      "specId": "93045d7c-dd57-5cec-9b67-db770ab51a59",
+      "shortName": "i2736x1260a0",
+      "dimensions": {
+        "minWidth": 2736,
+        "maxWidth": 2736,
+        "minHeight": 1260,
+        "maxHeight": 1260
+      },
+      "aspectRatio": "13:6",
+      "compatiblePlacementTypes": [
+        "APP_SCREENSHOT",
+        "IMESSAGE_APP_SCREENSHOT"
+      ],
+      "alphaAllowed": false,
+      "fileExtensions": [
+        ".jpg",
+        ".jpeg",
+        ".png"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "image/jpeg",
+        "image/png"
+      ],
+      "universalAsset": false
+    },
+    {
+      "specId": "1cac3bef-0c30-5432-bd89-cb98946a1441",
+      "shortName": "i1260x2736a0",
+      "dimensions": {
+        "minWidth": 1260,
+        "maxWidth": 1260,
+        "minHeight": 2736,
+        "maxHeight": 2736
+      },
+      "aspectRatio": "6:13",
+      "compatiblePlacementTypes": [
+        "APP_SCREENSHOT",
+        "IMESSAGE_APP_SCREENSHOT"
+      ],
+      "alphaAllowed": false,
+      "fileExtensions": [
+        ".jpg",
+        ".jpeg",
+        ".png"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "image/jpeg",
+        "image/png"
+      ],
+      "universalAsset": false
+    },
+    {
+      "specId": "92546362-6039-58e6-9823-97f9f7b02c2e",
+      "shortName": "i2688x1242a0",
+      "dimensions": {
+        "minWidth": 2688,
+        "maxWidth": 2688,
+        "minHeight": 1242,
+        "maxHeight": 1242
+      },
+      "aspectRatio": "13:6",
+      "compatiblePlacementTypes": [
+        "APP_SCREENSHOT",
+        "IMESSAGE_APP_SCREENSHOT"
+      ],
+      "alphaAllowed": false,
+      "fileExtensions": [
+        ".jpg",
+        ".jpeg",
+        ".png"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "image/jpeg",
+        "image/png"
+      ],
+      "universalAsset": false
+    },
+    {
+      "specId": "a919c413-9548-5665-a715-3e6e764f0a61",
+      "shortName": "i1242x2688a0",
+      "dimensions": {
+        "minWidth": 1242,
+        "maxWidth": 1242,
+        "minHeight": 2688,
+        "maxHeight": 2688
+      },
+      "aspectRatio": "6:13",
+      "compatiblePlacementTypes": [
+        "APP_SCREENSHOT",
+        "IMESSAGE_APP_SCREENSHOT"
+      ],
+      "alphaAllowed": false,
+      "fileExtensions": [
+        ".jpg",
+        ".jpeg",
+        ".png"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "image/jpeg",
+        "image/png"
+      ],
+      "universalAsset": false
+    },
+    {
+      "specId": "ccc70ced-8d90-5dd4-a560-2a34e19d2fac",
+      "shortName": "i2778x1284a0",
+      "dimensions": {
+        "minWidth": 2778,
+        "maxWidth": 2778,
+        "minHeight": 1284,
+        "maxHeight": 1284
+      },
+      "aspectRatio": "13:6",
+      "compatiblePlacementTypes": [
+        "APP_SCREENSHOT",
+        "IMESSAGE_APP_SCREENSHOT"
+      ],
+      "alphaAllowed": false,
+      "fileExtensions": [
+        ".jpg",
+        ".jpeg",
+        ".png"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "image/jpeg",
+        "image/png"
+      ],
+      "universalAsset": false
+    },
+    {
+      "specId": "bfac57aa-e751-5a8f-b4a9-2743e268b899",
+      "shortName": "i1284x2778a0",
+      "dimensions": {
+        "minWidth": 1284,
+        "maxWidth": 1284,
+        "minHeight": 2778,
+        "maxHeight": 2778
+      },
+      "aspectRatio": "6:13",
+      "compatiblePlacementTypes": [
+        "APP_SCREENSHOT",
+        "IMESSAGE_APP_SCREENSHOT"
+      ],
+      "alphaAllowed": false,
+      "fileExtensions": [
+        ".jpg",
+        ".jpeg",
+        ".png"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "image/jpeg",
+        "image/png"
+      ],
+      "universalAsset": false
+    },
+    {
+      "specId": "4fb432dd-fda6-539d-9408-50b88c7b99ce",
+      "shortName": "i2732x2048a0",
+      "dimensions": {
+        "minWidth": 2732,
+        "maxWidth": 2732,
+        "minHeight": 2048,
+        "maxHeight": 2048
+      },
+      "aspectRatio": "4:3",
+      "compatiblePlacementTypes": [
+        "APP_SCREENSHOT",
+        "IMESSAGE_APP_SCREENSHOT"
+      ],
+      "alphaAllowed": false,
+      "fileExtensions": [
+        ".jpg",
+        ".jpeg",
+        ".png"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "image/jpeg",
+        "image/png"
+      ],
+      "universalAsset": false
+    },
+    {
+      "specId": "19e742ba-9d8e-578f-a476-27b6bc58f6e0",
+      "shortName": "i2048x2732a0",
+      "dimensions": {
+        "minWidth": 2048,
+        "maxWidth": 2048,
+        "minHeight": 2732,
+        "maxHeight": 2732
+      },
+      "aspectRatio": "3:4",
+      "compatiblePlacementTypes": [
+        "APP_SCREENSHOT",
+        "IMESSAGE_APP_SCREENSHOT"
+      ],
+      "alphaAllowed": false,
+      "fileExtensions": [
+        ".jpg",
+        ".jpeg",
+        ".png"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "image/jpeg",
+        "image/png"
+      ],
+      "universalAsset": false
+    },
+    {
+      "specId": "91f7a113-9ce7-5ccc-a265-ac752da04d85",
+      "shortName": "i2752x2064a0",
+      "dimensions": {
+        "minWidth": 2752,
+        "maxWidth": 2752,
+        "minHeight": 2064,
+        "maxHeight": 2064
+      },
+      "aspectRatio": "4:3",
+      "compatiblePlacementTypes": [
+        "APP_SCREENSHOT",
+        "IMESSAGE_APP_SCREENSHOT"
+      ],
+      "alphaAllowed": false,
+      "fileExtensions": [
+        ".jpg",
+        ".jpeg",
+        ".png"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "image/jpeg",
+        "image/png"
+      ],
+      "universalAsset": false
+    },
+    {
+      "specId": "1751a63a-af79-5c7f-a2f2-41140bf28f9e",
+      "shortName": "i2064x2752a0",
+      "dimensions": {
+        "minWidth": 2064,
+        "maxWidth": 2064,
+        "minHeight": 2752,
+        "maxHeight": 2752
+      },
+      "aspectRatio": "3:4",
+      "compatiblePlacementTypes": [
+        "APP_SCREENSHOT",
+        "IMESSAGE_APP_SCREENSHOT"
+      ],
+      "alphaAllowed": false,
+      "fileExtensions": [
+        ".jpg",
+        ".jpeg",
+        ".png"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "image/jpeg",
+        "image/png"
+      ],
+      "universalAsset": false
+    },
+    {
+      "specId": "72e265ca-2840-5d89-8f6b-16681162fa46",
+      "shortName": "i2880x1800a1",
+      "dimensions": {
+        "minWidth": 2880,
+        "maxWidth": 2880,
+        "minHeight": 1800,
+        "maxHeight": 1800
+      },
+      "aspectRatio": "16:9",
+      "compatiblePlacementTypes": [
+        "APP_SCREENSHOT"
+      ],
+      "alphaAllowed": true,
+      "fileExtensions": [
+        ".jpg",
+        ".jpeg",
+        ".png"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "image/jpeg",
+        "image/png"
+      ],
+      "universalAsset": false
+    },
+    {
+      "specId": "e5e2837e-00f0-5651-9bd5-761be7fe39a8",
+      "shortName": "i2560x1600a1",
+      "dimensions": {
+        "minWidth": 2560,
+        "maxWidth": 2560,
+        "minHeight": 1600,
+        "maxHeight": 1600
+      },
+      "aspectRatio": "16:9",
+      "compatiblePlacementTypes": [
+        "APP_SCREENSHOT"
+      ],
+      "alphaAllowed": true,
+      "fileExtensions": [
+        ".jpg",
+        ".jpeg",
+        ".png"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "image/jpeg",
+        "image/png"
+      ],
+      "universalAsset": false
+    },
+    {
+      "specId": "09ab13ff-9353-5f42-8ecc-d080dc7ec1a1",
+      "shortName": "i1440x900a1",
+      "dimensions": {
+        "minWidth": 1440,
+        "maxWidth": 1440,
+        "minHeight": 900,
+        "maxHeight": 900
+      },
+      "aspectRatio": "16:9",
+      "compatiblePlacementTypes": [
+        "APP_SCREENSHOT"
+      ],
+      "alphaAllowed": true,
+      "fileExtensions": [
+        ".jpg",
+        ".jpeg",
+        ".png"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "image/jpeg",
+        "image/png"
+      ],
+      "universalAsset": false
+    },
+    {
+      "specId": "f1f0df9c-dfa0-5bda-910b-12dd4c82758b",
+      "shortName": "i1280x800a1",
+      "dimensions": {
+        "minWidth": 1280,
+        "maxWidth": 1280,
+        "minHeight": 800,
+        "maxHeight": 800
+      },
+      "aspectRatio": "16:9",
+      "compatiblePlacementTypes": [
+        "APP_SCREENSHOT"
+      ],
+      "alphaAllowed": true,
+      "fileExtensions": [
+        ".jpg",
+        ".jpeg",
+        ".png"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "image/jpeg",
+        "image/png"
+      ],
+      "universalAsset": false
+    },
+    {
+      "specId": "fc7a939d-2318-525f-91b9-f294a547e77e",
+      "shortName": "i410x502a0",
+      "dimensions": {
+        "minWidth": 410,
+        "maxWidth": 410,
+        "minHeight": 502,
+        "maxHeight": 502
+      },
+      "aspectRatio": "3:4",
+      "compatiblePlacementTypes": [
+        "APP_SCREENSHOT"
+      ],
+      "alphaAllowed": false,
+      "fileExtensions": [
+        ".jpg",
+        ".jpeg",
+        ".png"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "image/jpeg",
+        "image/png"
+      ],
+      "universalAsset": false
+    },
+    {
+      "specId": "0cf4925d-6afa-59f2-963a-8ac25b773c61",
+      "shortName": "i422x514a0",
+      "dimensions": {
+        "minWidth": 422,
+        "maxWidth": 422,
+        "minHeight": 514,
+        "maxHeight": 514
+      },
+      "aspectRatio": "3:4",
+      "compatiblePlacementTypes": [
+        "APP_SCREENSHOT"
+      ],
+      "alphaAllowed": false,
+      "fileExtensions": [
+        ".jpg",
+        ".jpeg",
+        ".png"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "image/jpeg",
+        "image/png"
+      ],
+      "universalAsset": false
+    },
+    {
+      "specId": "47d5a794-c036-4342-8923-988990c81af9",
+      "shortName": "i2034x1398a0",
+      "dimensions": {
+        "minWidth": 2034,
+        "maxWidth": 2034,
+        "minHeight": 1398,
+        "maxHeight": 1398
+      },
+      "aspectRatio": "3:2",
+      "compatiblePlacementTypes": [
+        "APP_SCREENSHOT",
+        "IMESSAGE_APP_SCREENSHOT"
+      ],
+      "alphaAllowed": false,
+      "fileExtensions": [
+        ".jpg",
+        ".jpeg",
+        ".png"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "image/jpeg",
+        "image/png"
+      ],
+      "universalAsset": false
+    },
+    {
+      "specId": "205e7ab6-a23a-4ee2-b327-0a99ec2a2520",
+      "shortName": "i1398x2034a0",
+      "dimensions": {
+        "minWidth": 1398,
+        "maxWidth": 1398,
+        "minHeight": 2034,
+        "maxHeight": 2034
+      },
+      "aspectRatio": "2:3",
+      "compatiblePlacementTypes": [
+        "APP_SCREENSHOT",
+        "IMESSAGE_APP_SCREENSHOT"
+      ],
+      "alphaAllowed": false,
+      "fileExtensions": [
+        ".jpg",
+        ".jpeg",
+        ".png"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "image/jpeg",
+        "image/png"
+      ],
+      "universalAsset": false
+    },
+    {
+      "specId": "b83915b8-5b87-4e63-bba5-ab3a0c439862",
+      "shortName": "i2853x2007a0",
+      "dimensions": {
+        "minWidth": 2853,
+        "maxWidth": 2853,
+        "minHeight": 2007,
+        "maxHeight": 2007
+      },
+      "aspectRatio": "3:2",
+      "compatiblePlacementTypes": [
+        "APP_SCREENSHOT",
+        "IMESSAGE_APP_SCREENSHOT"
+      ],
+      "alphaAllowed": false,
+      "fileExtensions": [
+        ".jpg",
+        ".jpeg",
+        ".png"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "image/jpeg",
+        "image/png"
+      ],
+      "universalAsset": false
+    },
+    {
+      "specId": "5d458eef-8339-4a1f-a484-83d53834cfec",
+      "shortName": "i2007x2853a0",
+      "dimensions": {
+        "minWidth": 2007,
+        "maxWidth": 2007,
+        "minHeight": 2853,
+        "maxHeight": 2853
+      },
+      "aspectRatio": "2:3",
+      "compatiblePlacementTypes": [
+        "APP_SCREENSHOT",
+        "IMESSAGE_APP_SCREENSHOT"
+      ],
+      "alphaAllowed": false,
+      "fileExtensions": [
+        ".jpg",
+        ".jpeg",
+        ".png"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "image/jpeg",
+        "image/png"
+      ],
+      "universalAsset": false
+    }
+  ],
+  "videoSpecs": [
+    {
+      "specId": "a28b6440-2fe2-58f0-9da3-354cb54cab57",
+      "shortName": "v3x2w1920~3840f30f60t15~30u0",
+      "dimensions": {
+        "minWidth": 1920,
+        "maxWidth": 3840,
+        "minHeight": 1280,
+        "maxHeight": 2560
+      },
+      "aspectRatio": "3:2",
+      "compatiblePlacementTypes": [
+        "APP_STORE_SEARCH_RESULTS_ASSET"
+      ],
+      "frameRates": [
+        {
+          "minFps": 30,
+          "maxFps": 30
+        },
+        {
+          "minFps": 60,
+          "maxFps": 60
+        }
+      ],
+      "duration": {
+        "min": "PT5S",
+        "max": "PT30S"
+      },
+      "audioRequired": false,
+      "fileExtensions": [
+        ".mp4",
+        ".m4v",
+        ".mov"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "video/quicktime",
+        "video/mp4",
+        "video/x-m4v"
+      ],
+      "universalAsset": false
+    },
+    {
+      "specId": "8aeaae00-2a17-4781-bfc0-44ca02e26ccb",
+      "shortName": "v3840x1646f30f60t10~30u0",
+      "dimensions": {
+        "minWidth": 3840,
+        "maxWidth": 3840,
+        "minHeight": 1646,
+        "maxHeight": 1646
+      },
+      "aspectRatio": "21:9",
+      "compatiblePlacementTypes": [
+        "PRODUCT_PAGE_HEADER_ASSET"
+      ],
+      "frameRates": [
+        {
+          "minFps": 30,
+          "maxFps": 30
+        },
+        {
+          "minFps": 60,
+          "maxFps": 60
+        }
+      ],
+      "duration": {
+        "min": "PT5S",
+        "max": "PT30S"
+      },
+      "audioRequired": false,
+      "fileExtensions": [
+        ".mp4",
+        ".m4v",
+        ".mov"
+      ],
+      "maxFileSize": 524288000,
+      "mimeTypes": [
+        "video/quicktime",
+        "video/mp4",
+        "video/x-m4v"
+      ],
+      "universalAsset": false
+    }
+  ],
+  "placementTypes": [
+    {
+      "placementTypeId": "PRODUCT_PAGE_HEADER_ASSET",
+      "acceptsAssetCategories": [
+        "CREATIVE_ASSETS"
+      ],
+      "specMappings": [
+        {
+          "placementGroupId": "DEFAULT_PROFILE",
+          "specs": [
+            "c8f4e2b1-7a3d-5c9e-8b6f-2d1a0e9c8b7a",
+            "1eb43b80-e0b7-4d96-bd32-47a42a8c5fed",
+            "8aeaae00-2a17-4781-bfc0-44ca02e26ccb"
+          ]
+        }
+      ]
+    },
+    {
+      "placementTypeId": "APP_STORE_SEARCH_RESULTS_ASSET",
+      "acceptsAssetCategories": [
+        "CREATIVE_ASSETS"
+      ],
+      "specMappings": [
+        {
+          "placementGroupId": "DEFAULT_PROFILE",
+          "specs": [
+            "c8f4e2b1-7a3d-5c9e-8b6f-2d1a0e9c8b7a",
+            "d2ffa3b7-6c55-5cdf-8512-229d92791333",
+            "a28b6440-2fe2-58f0-9da3-354cb54cab57"
+          ]
+        }
+      ]
+    },
+    {
+      "placementTypeId": "APP_SCREENSHOT",
+      "acceptsAssetCategories": [
+        "APP_SCREENSHOTS_AND_PREVIEWS"
+      ],
+      "specMappings": [
+        {
+          "placementGroupId": "IPHONE_DYNAMIC_ISLAND_LARGE_PROFILE",
+          "specs": [
+            "e00744ec-5f5d-5017-b97a-84f5c761c2b7",
+            "f56c777c-99ea-5760-97ae-27c5f8cbb884",
+            "38e4b05b-3e42-563f-83ed-58f9ac76069e",
+            "bd402f1a-26ee-5b83-9dd7-972c60c43d47",
+            "93045d7c-dd57-5cec-9b67-db770ab51a59",
+            "1cac3bef-0c30-5432-bd89-cb98946a1441"
+          ]
+        },
+        {
+          "placementGroupId": "IPHONE_FACE_ID_LARGE_PROFILE",
+          "specs": [
+            "92546362-6039-58e6-9823-97f9f7b02c2e",
+            "a919c413-9548-5665-a715-3e6e764f0a61",
+            "ccc70ced-8d90-5dd4-a560-2a34e19d2fac",
+            "bfac57aa-e751-5a8f-b4a9-2743e268b899"
+          ]
+        },
+        {
+          "placementGroupId": "IPAD_13_PROFILE",
+          "specs": [
+            "4fb432dd-fda6-539d-9408-50b88c7b99ce",
+            "19e742ba-9d8e-578f-a476-27b6bc58f6e0",
+            "91f7a113-9ce7-5ccc-a265-ac752da04d85",
+            "1751a63a-af79-5c7f-a2f2-41140bf28f9e"
+          ]
+        },
+        {
+          "placementGroupId": "MAC_PROFILE",
+          "specs": [
+            "72e265ca-2840-5d89-8f6b-16681162fa46",
+            "e5e2837e-00f0-5651-9bd5-761be7fe39a8",
+            "09ab13ff-9353-5f42-8ecc-d080dc7ec1a1",
+            "f1f0df9c-dfa0-5bda-910b-12dd4c82758b"
+          ]
+        },
+        {
+          "placementGroupId": "WATCH_ULTRA_PROFILE",
+          "specs": [
+            "fc7a939d-2318-525f-91b9-f294a547e77e",
+            "0cf4925d-6afa-59f2-963a-8ac25b773c61"
+          ]
+        },
+        {
+          "placementGroupId": "IPHONE_DUO_PROFILE",
+          "specs": [
+            "47d5a794-c036-4342-8923-988990c81af9",
+            "205e7ab6-a23a-4ee2-b327-0a99ec2a2520",
+            "b83915b8-5b87-4e63-bba5-ab3a0c439862",
+            "5d458eef-8339-4a1f-a484-83d53834cfec"
+          ]
+        }
+      ]
+    }
+  ],
+  "displayClasses": [
+    {
+      "displayClassId": "DEFAULT",
+      "deviceFamily": null,
+      "screenDimensions": []
+    },
+    {
+      "displayClassId": "WATCH_ULTRA",
+      "deviceFamily": "APPLE_WATCH",
+      "screenDimensions": [
+        "49"
+      ]
+    },
+    {
+      "displayClassId": "IPHONE_DYNAMIC_ISLAND_LARGE_DISPLAY",
+      "deviceFamily": "IPHONE",
+      "screenDimensions": [
+        "2736x1260",
+        "2796x1290",
+        "2868x1320"
+      ]
+    },
+    {
+      "displayClassId": "IPHONE_FACE_ID_LARGE_DISPLAY",
+      "deviceFamily": "IPHONE",
+      "screenDimensions": [
+        "2688x1242",
+        "2778x1284"
+      ]
+    },
+    {
+      "displayClassId": "IPAD_13_DISPLAY",
+      "deviceFamily": "IPAD",
+      "screenDimensions": [
+        "2732x2048",
+        "2752x2064"
+      ]
+    },
+    {
+      "displayClassId": "IPHONE_DUO",
+      "deviceFamily": "IPHONE",
+      "screenDimensions": [
+        "2853x2007",
+        "2034x1398"
+      ]
+    }
+  ]
+}

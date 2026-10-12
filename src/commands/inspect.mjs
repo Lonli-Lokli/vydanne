@@ -1,3 +1,6 @@
+import { CREATIVE_SLOTS } from "../assetCatalog.mjs";
+import { placementsOn } from "../assetLibrary.mjs";
+
 // Read-only snapshot of what's in App Store Connect now, per platform.
 export async function run(config, client) {
   await client.findApp(config.bundleId);
@@ -17,6 +20,19 @@ export async function run(config, client) {
     const pp = await client.get(`/v1/appStoreVersionLocalizations/${primary.id}/appPreviewSets?include=appPreviews&limit=50`);
     const psets = (pp.json.data || []).map((s) => `${s.attributes.previewType}=${(s.relationships?.appPreviews?.data || []).length}`).filter((x) => !x.endsWith("=0"));
     if (psets.length) console.log(`     previews (${primary.attributes.locale}): ${psets.join("  ")}`);
+    // The iOS 27 creative slots live only in the Asset Library, so they are read from its placements. A key
+    // without the library role gets a 403 here, which is said rather than shown as two empty slots.
+    if (platform === "IOS") {
+      const placed = await placementsOn(client, primary.id);
+      if (!placed) console.log(`     creative (${primary.attributes.locale}): Asset Library not readable with this key`);
+      else {
+        const show = (slot) => {
+          const p = placed.find((x) => x.placementType === CREATIVE_SLOTS[slot].placementType);
+          return p ? `${p.kind} ${p.asset?.fileName || p.asset?.id || p.id} (${p.state})` : "none";
+        };
+        console.log(`     creative (${primary.attributes.locale}): header=${show("header")}  search=${show("search")}`);
+      }
+    }
   }
   return true;
 }

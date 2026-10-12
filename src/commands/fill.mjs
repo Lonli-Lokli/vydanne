@@ -6,6 +6,7 @@ import { uploadAsset } from "../upload.mjs";
 import { reportCrossStore } from "../crossStore.mjs";
 import { deviceMap, screenshotBase, IMAGE_FILE } from "../screenshots.mjs";
 import { appStoreNotesFile } from "../notes.mjs";
+import { loadCatalog } from "../assetCatalog.mjs";
 
 // Version-localization fields (attr -> metadata filename) and AppInfo fields (shared across releases).
 const VERSION_TXT = { description: "description", keywords: "keywords", promotionalText: "promotional_text", whatsNew: "release_notes", marketingUrl: "marketing_url", supportUrl: "support_url" };
@@ -174,7 +175,9 @@ export async function run(config, client) {
       if (failed) ok = false;
     }
 
-    if (!skipShots) await uploadScreenshots(config, client, platform, verLocs);
+    // Its verdict counts now. It used to be awaited and dropped, which was harmless while every failure in
+    // it was a thrown error; a set refused for holding too many files is not one, and must still fail.
+    if (!skipShots && (await uploadScreenshots(config, client, platform, verLocs)) === false) ok = false;
   }
   return ok;
 }
@@ -182,7 +185,12 @@ export async function run(config, client) {
 async function uploadScreenshots(config, client, platform, verLocs) {
   const base = screenshotBase(platform, config);
   const DEV = deviceMap(platform);
-  if (!fs.existsSync(base)) return;
+  if (!fs.existsSync(base)) return true;
+  // How many files each set holds, from Apple's catalog (ten for every screenshot set today). Checked
+  // before the first upload of a set, because Apple refuses only the reservation that goes over, by
+  // which point the rest of the set is already on the store.
+  const catalog = await loadCatalog(client);
+  let ok = true;
   const dirs = fs.readdirSync(base, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
   const strays = dirs.filter((d) => !VALID.has(d));
   if (strays.length) console.log(yellow(`    ${strays.length} screenshot folder(s) are not App Store locale codes, skipped: ${strays.join(", ")}`));
@@ -202,6 +210,12 @@ async function uploadScreenshots(config, client, platform, verLocs) {
     if (unknown.length) console.log(yellow(`    ${code}: ${unknown.length} file(s) with no device prefix, not uploaded: ${unknown.slice(0, 3).join(", ")}${unknown.length > 3 ? ", …" : ""} (known: ${Object.keys(DEV).join(", ")})`));
     const { json: sets } = await client.get(`/v1/appStoreVersionLocalizations/${loc.id}/appScreenshotSets?include=appScreenshots&limit=50`);
     for (const [dt, list] of Object.entries(byDev)) {
+      const max = catalog.screenshotLimit(dt);
+      if (max != null && list.length > max) {
+        console.error(red(`    ${code}/${dt}: ${list.length} files for a set of ${max} — none uploaded; remove some (an iPhone Duo set holds outer and inner together)`));
+        ok = false;
+        continue;
+      }
       let set = (sets.data || []).find((s) => s.attributes.screenshotDisplayType === dt);
       // A populated slot used to `continue` unconditionally — "never duplicate", but it also meant a
       // re-render could NEVER reach a listing that already had images, and because the skip happened
@@ -221,4 +235,5 @@ async function uploadScreenshots(config, client, platform, verLocs) {
       console.log(green(`    ${code}/${dt}: ${list.length} screenshots`));
     }
   }
+  return ok;
 }

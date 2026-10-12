@@ -56,8 +56,8 @@ which user file was used, and whether the `.p8` is on disk.
 **Config fields:** `bundleId` · `primaryLocale` (the fallback — must be populated) · `asc` (optional
 `{profile}` — selection only, never secrets) · `platforms` (iOS and macOS are SEPARATE) · `uiLocales`
 (auto-mapped to ASC codes) · `localeMap` · `metadataDir` · `screenshots` · `rating` · `ageRating` ·
-`privacy` · `iaps` · `previews` · `export` · `accessibility` · `ios` · `google` (Google Play) ·
-`bridge` · `push` · `reviewContact` · `allowCrossStoreTerms` · `buildNumberOffset`.
+`privacy` · `iaps` · `previews` · `creative` (iOS 27 header + search asset) · `export` · `accessibility` ·
+`ios` · `google` (Google Play) · `bridge` · `push` · `reviewContact` · `allowCrossStoreTerms` · `buildNumberOffset`.
 
 **Paths are defaults, not laws.** `metadataDir` (default `fastlane/metadata`), `screenshots`
 (`{IOS, MAC_OS}`, default `fastlane/screenshots` + `-macos`) and `google.images` (Play image type →
@@ -118,12 +118,32 @@ before the **first underscore** selects the device slot; files upload in sorted 
 | `iphone69_` | `APP_IPHONE_67` (6.9″) |
 | `iphone65_` | `APP_IPHONE_65` |
 | `ipad13_` | `APP_IPAD_PRO_3GEN_129` |
+| `iphoneduo_` | `APP_IPHONE_DUO` — iPhone Duo, outer AND inner screens in ONE set of ten |
 | `watch_` | `APP_WATCH_ULTRA` |
 | `macos_` | `APP_DESKTOP` (in `screenshots-macos/`) |
 
 A file with an unknown prefix is not uploaded, and `fill` names it. A set that **already has
 screenshots is skipped** (and says so), never duplicated — `VYDANNE_REPLACE=1` deletes the store's set
-and uploads yours, the same flag `previews` uses. PNGs must be **RGB with no alpha**.
+and uploads yours, the same flag `previews` uses. PNGs must be **RGB with no alpha**, at a size the set
+takes, and at most **ten per set** — `bridge`, `preflight` and `fill` check both against Apple's catalog.
+
+**iPhone Duo** is one set for both screens: outer 1398×2034 / 2034×1398, inner 2007×2853 / 2853×2007
+(Apple's catalog has all four under one placement group, limit ten; the display type `APP_IPHONE_DUO` is
+not in the published OpenAPI but the live API creates it). Filename order is display order, so name
+them in the order you want (`bridge` does: `iphoneduo_1-outer_01-home.png`, then `…_2-inner_…`).
+Optional until April 2027, then required for apps built with the iOS 27.1 SDK or later — `preflight`
+notes it until then and blocks from then (`VYDANNE_DUO_OPTIONAL=1` for an app on an older SDK).
+
+**Product page header + search results asset (iOS 27)** — `<creative.dir>/<ASC-locale>/header.<png|jpg|mp4|mov|m4v>`
+and `search.<…>`, default `fastlane/creative`; one file per slot. Header: 5244×2950 PNG (universal) or
+3840×1646 PNG; video 3840×1646, 30/60 fps, 5–30 s. Search: 5244×2950 PNG or 3:2 from 1920×1280 to
+3840×2560 (PNG/JPEG); video the same 3:2 range, 30/60 fps, 5–30 s. `vydanne creative` checks them
+against Apple's LIVE catalog (`GET /v1/appAssetLibraryRefData`), uploads each distinct file once into
+the App Asset Library and places it per localization of the version being prepared. The md5 rides in the
+asset's reference name (the library keeps no checksum) — that is what `diff`/`preflight` compare.
+`creative.searchFromHeader: true` reuses a universal header in search. Submitting library assets on
+their own, and publishing onto the LIVE version, are App Store Connect UI only; `creative` prints the
+steps.
 
 **Play listing text** — `<google.metadataDir>/<PLAY-locale>/{title,short_description,full_description}.txt`
 (30 / 80 / 4000). Play uses its **own** codes (`de-DE`, `zh-CN`, `iw-IL`, `ar`, `be`) — *not* Apple's
@@ -146,7 +166,9 @@ into localized art, and a `<source>/<lang>/` subdirectory overrides the shared s
 **`bridge` populates both screenshot layouts from zdymak's output.** It maps
 `store-assets/<locale>/<dir>/NN-name.png` onto the Apple and Play paths above: locale codes via the
 same `toAsc` table `fill` uses (`de` → `de-DE`; a code with no App Store language is skipped and falls
-back to the primary listing), the device-slot prefix prepended (`iphone69_01-fresh.png`), and the Play
+back to the primary listing), the device-slot prefix prepended (`iphone69_01-fresh.png`; zdymak's
+`appstore-iphone-duo-outer`/`-inner`/`-inner-landscape` merged into one `iphoneduo_` set, order set by
+`bridge.apple.iphoneduo: { dirs, order: "display" | "scene" }`), and the Play
 sets into their configured destinations. A locale with screenshots but NO listing text is held back
 (uploading pictures alone would create the localization and break its fallback to the primary
 language), and every bridged image is checked for an alpha channel — which Apple rejects — on the
@@ -211,7 +233,8 @@ who it's for → honest close. Keep it scannable; lead each bullet with the payo
 ## B. Commands (push it)
 
 `fill` (metadata + screenshots, native PATCH/chunked upload — works even at READY_FOR_REVIEW) ·
-`previews` (App Preview videos) · `appinfo` (category + content rights) · `age-rating` · `review-contact` · `accessibility` (draft; publish once
+`previews` (App Preview videos) · `creative` (iOS 27 product page header + search results asset, via the
+App Asset Library) · `appinfo` (category + content rights) · `age-rating` · `review-contact` · `accessibility` (draft; publish once
 live) · `privacy` (prints answers for the UI — the API can't reach Apple's iris host) · `iap` (validate +
 RGB flatten) · `compliance` (US self-classification PDF) · `bridge` (zdymak's output → the folders
 `fill` reads) · `diff` (what differs vs live, text AND media by checksum) · `preflight`
@@ -236,7 +259,7 @@ blocking; `allowCrossStoreTerms: [...]` in the config silences a specific one, a
 `VYDANNE_ALLOW_CROSS_STORE=1` overrides a single run. This is a rejection that surfaces days later in
 one locale out of twenty, so it is checked where it is free to fix.
 
-**The pipeline has ONE working order** — `prepare` → `fill` → `previews` → `age-rating` →
+**The pipeline has ONE working order** — `prepare` → `fill` → `previews` → `creative` → `age-rating` →
 `review-contact` → `accessibility` → `preflight` → **a human submits**. `prepare` must be first (until
 the draft version exists, nothing has anywhere to write) and `preflight` last (green must be measured
 after the writes it blesses). `push` runs exactly that sequence — each step the same `run` as the
@@ -427,7 +450,8 @@ through that client. **A new command that touches the store must be marked `writ
 `src/registry.mjs`** — that flag is the whole opt-in, not a label.
 
 **Env toggles:** `VYDANNE_CONFIG` · `VYDANNE_SKIP_METADATA` / `VYDANNE_SKIP_SCREENSHOTS` (fill) ·
-`VYDANNE_REPLACE` (fill screenshots + previews: replace populated slots) · `VYDANNE_VERSION` (prepare) ·
+`VYDANNE_REPLACE` (fill screenshots + previews + creative: replace populated slots) ·
+`VYDANNE_DUO_OPTIONAL` (preflight from April 2027: the build is on an SDK older than iOS 27.1) · `VYDANNE_VERSION` (prepare) ·
 `VYDANNE_IPA` / `VYDANNE_AAB` / `VYDANNE_TRACK` / `VYDANNE_RELEASE_NAME` (prerelease) ·
 `VYDANNE_FLATTEN=<png>` (iap) · `VYDANNE_A11Y_PUBLISH` (accessibility) · `VYDANNE_ALLOW_CROSS_STORE`
 (one run past the cross-store lint) · `VYDANNE_COMMIT=1` (legacy alias for `--apply`; prefer the flag).
@@ -437,7 +461,7 @@ through that client. **A new command that touches the store must be marked `writ
 config → **write the English master listing (ASO, research-grounded)** → fan out one copywriter agent
 per locale → media from zdymak → **`bridge`** (zdymak's output into vydanne's folders — every time) →
 build via `prerelease --apply` whenever it is ready → `push` (read the dry run, then re-run with
-`--apply` — it is prepare → fill → previews → age-rating → review-contact → accessibility → preflight,
+`--apply` — it is prepare → fill → previews → creative → age-rating → review-contact → accessibility → preflight,
 stopping at the first failure) → `diff` to confirm → **a human submits**.
 
 ## Gotchas it encodes (don't re-derive)

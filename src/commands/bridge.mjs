@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 import { green, yellow, red } from "../util.mjs";
 import { toAsc } from "../locales.mjs";
 import { IOS_DEVICE, MAC_DEVICE, screenshotBase, IMAGE_FILE } from "../screenshots.mjs";
+import { SNAPSHOT_CATALOG, mismatch, describeSize } from "../assetCatalog.mjs";
 import { playImages } from "../play/images.mjs";
 
 /**
@@ -58,8 +59,51 @@ const APPLE_SLOTS = {
   iphone69: "appstore-iphone-6.9",
   iphone65: "appstore-iphone-6.5",
   ipad13: "appstore-ipad-13",
+  // ONE store set fed by SEVERAL directories — the only slot shaped like this. A string or array above is
+  // "the first of these that exists"; an object is "every one of these that exists, merged, in this
+  // order". iPhone Duo has two screens and Apple holds both in a single set (see IOS_DEVICE in
+  // screenshots.mjs for the evidence), so its outer and inner captures must land in one folder side by
+  // side, named so that `fill`'s filename order is the order the store shows.
+  //
+  // `order` is a decision Apple has not documented: nothing published says how the App Store sequences
+  // a mixed Duo set or which screen a folded phone shows first. "display" (all outer, then all inner,
+  // then inner landscape) is the default because the outer screen is the phone-shaped one and the first
+  // few shots are what search results show; "scene" interleaves them (01 outer, 01 inner, 02 outer …)
+  // for a gallery that pairs each screen with its unfolded twin. Overridable per app — `bridge.apple`.
+  iphoneduo: { dirs: ["appstore-iphone-duo-outer", "appstore-iphone-duo-inner", "appstore-iphone-duo-inner-landscape"], order: "display" },
   watch: "appstore-watch",
 };
+
+/** A slot's directories, whichever shape it was given in. */
+const slotDirs = (value) => (value && typeof value === "object" && !Array.isArray(value) ? value.dirs || [] : [value].flat());
+
+/**
+ * What each merged directory is called inside the file name: the directory with the prefix every one of
+ * them shares removed, so `appstore-iphone-duo-outer` becomes `outer`. Cut at a hyphen, so a shared
+ * `appstore-iphone-duo-inner` / `-inner-landscape` pair is not trimmed into the middle of a word.
+ */
+export function dirLabels(dirs) {
+  if (dirs.length < 2) return dirs.slice();
+  let prefix = dirs[0];
+  for (const d of dirs) while (!d.startsWith(prefix)) prefix = prefix.slice(0, -1);
+  prefix = prefix.slice(0, prefix.lastIndexOf("-") + 1);
+  return dirs.map((d) => d.slice(prefix.length) || d);
+}
+
+/**
+ * The bridged name of one file in a merged slot. Rank and label sit in the name so that a plain sort —
+ * which is all `fill` does — reproduces the order chosen:
+ *   display  iphoneduo_1-outer_01-home.png, iphoneduo_1-outer_02-table.png, iphoneduo_2-inner_01-home.png
+ *   scene    iphoneduo_01-home_1-outer.png, iphoneduo_01-home_2-inner.png, iphoneduo_02-table_1-outer.png
+ */
+export function mergedName(slot, rank, label, img, order = "display") {
+  if (order === "scene") {
+    const ext = path.extname(img);
+    return `${slot}_${path.basename(img, ext)}_${rank + 1}-${label}${ext}`;
+  }
+  return `${slot}_${rank + 1}-${label}_${img}`;
+}
+
 /** macOS screenshots live under a different root entirely, so they are carried separately. */
 const MAC_SLOT = { macos: "appstore-mac" };
 
@@ -181,10 +225,24 @@ export async function run(config) {
   // source directories reported as "neither an output nor a locale" while being bridged correctly.
   const knownDirs = new Set([
     ...zd.knownDirs,
-    ...Object.values(appleSlots).flat(),
-    ...Object.values(macSlots).flat(),
+    ...Object.values(appleSlots).flatMap(slotDirs),
+    ...Object.values(macSlots).flatMap(slotDirs),
     ...Object.values(playSources).flat(),
   ]);
+  // A merged slot with an order nobody implemented is refused here, before any planning: silently falling
+  // back to "display" would ship an order the config says it did not ask for.
+  for (const [slot, value] of Object.entries(appleSlots)) {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      if (!Array.isArray(value.dirs) || !value.dirs.length) {
+        console.error(red(`bridge: bridge.apple.${slot} must name its directories — { dirs: [...], order: "display" | "scene" }`));
+        return false;
+      }
+      if (value.order && !["display", "scene"].includes(value.order)) {
+        console.error(red(`bridge: bridge.apple.${slot}.order is '${value.order}' — expected "display" or "scene"`));
+        return false;
+      }
+    }
+  }
   const localeDirs = dirsIn(SRC).filter((d) => {
     if (knownDirs.has(d)) return false;
     if (LOCALE_SHAPED.test(d)) return true;
@@ -208,12 +266,25 @@ export async function run(config) {
 
     for (const [root, slots] of [[APPLE, iosSlots], [APPLE_MAC, macSlots]]) {
       for (const [slot, candidates] of Object.entries(slots)) {
+        if (candidates && typeof candidates === "object" && !Array.isArray(candidates)) {
+          const present = candidates.dirs.filter((d) => fs.existsSync(path.join(from, d)));
+          const labels = dirLabels(candidates.dirs);
+          for (const dir of present) {
+            const rank = candidates.dirs.indexOf(dir);
+            for (const img of imagesIn(path.join(from, dir))) {
+              plan.push({ from: path.join(from, dir, img), to: path.join(root, asc, mergedName(slot, rank, labels[rank], img, candidates.order)), store: "apple", slot });
+              carried.add(dir);
+              written.add(asc);
+            }
+          }
+          continue;
+        }
         const dir = pick(from, [candidates].flat());
         if (!dir) continue;
         for (const img of imagesIn(path.join(from, dir))) {
           // fill selects the display type off the token before the first underscore, so an unprefixed
           // copy would be a file it silently ignores, in the folder where it looks.
-          plan.push({ from: path.join(from, dir, img), to: path.join(root, asc, `${slot}_${img}`), store: "apple" });
+          plan.push({ from: path.join(from, dir, img), to: path.join(root, asc, `${slot}_${img}`), store: "apple", slot });
           carried.add(dir);
           written.add(asc);
         }
@@ -266,17 +337,50 @@ export async function run(config) {
   // Checked here rather than after the copy for two reasons: a dry run can now report the refusal a
   // real run would hit, and a real run no longer leaves the rejected file sitting in the folder `fill`
   // uploads from — where the next run would send it to Apple and collect the rejection anyway.
+  //
+  // The same pass checks the two other things Apple refuses a set for, against its own catalog (the
+  // snapshot here — `bridge` has no client): a size the slot does not take, and more than the slot holds.
+  // The second is new with Duo: one store set now draws on several capture folders, so three sets of six
+  // scenes is eighteen files for a set of ten, and `fill` would upload ten and fail on the eleventh.
   const appleFiles = plan.filter((p) => p.store === "apple");
   if (appleFiles.length) {
     const { default: sharp } = await import("sharp");
     const withAlpha = [];
+    const wrongSize = [];
     for (const p of appleFiles) {
-      if ((await sharp(p.from).metadata()).hasAlpha) withAlpha.push(path.relative(process.cwd(), p.from));
+      const meta = await sharp(p.from).metadata();
+      if (meta.hasAlpha) withAlpha.push(path.relative(process.cwd(), p.from));
+      const specs = SNAPSHOT_CATALOG.screenshotSpecs(IOS_DEVICE[p.slot] || MAC_DEVICE[p.slot]);
+      if (specs.length && !specs.some((s) => !mismatch(s, { width: meta.width, height: meta.height, hasAlpha: false }, { ext: path.extname(p.from).toLowerCase(), bytes: 0 }))) {
+        wrongSize.push(`${path.relative(process.cwd(), p.from)}  ${meta.width}×${meta.height} — ${p.slot} takes ${specs.map(describeSize).join(", ")}`);
+      }
     }
-    if (withAlpha.length) {
-      console.error(red("bridge: these carry an alpha channel and Apple will reject them:"));
-      for (const p of withAlpha) console.error(`  ${p}`);
-      console.error("  Flatten at the source (zdymak), or per file: VYDANNE_FLATTEN=<png> vydanne iap");
+    const perSet = new Map();
+    for (const p of appleFiles) {
+      const key = `${path.relative(process.cwd(), path.dirname(p.to))}\u0000${p.slot}`;
+      perSet.set(key, (perSet.get(key) || 0) + 1);
+    }
+    const overfull = [...perSet].map(([key, n]) => {
+      const [dir, slot] = key.split("\u0000");
+      const max = SNAPSHOT_CATALOG.screenshotLimit(IOS_DEVICE[slot] || MAC_DEVICE[slot]);
+      return max != null && n > max ? `${dir}: ${n} ${slot} files for a set of ${max}` : null;
+    }).filter(Boolean);
+    if (withAlpha.length || wrongSize.length || overfull.length) {
+      if (withAlpha.length) {
+        console.error(red("bridge: these carry an alpha channel and Apple will reject them:"));
+        for (const p of withAlpha) console.error(`  ${p}`);
+        console.error("  Flatten at the source (zdymak), or per file: VYDANNE_FLATTEN=<png> vydanne iap");
+      }
+      if (wrongSize.length) {
+        console.error(red("bridge: these are a size their App Store slot does not take:"));
+        for (const p of wrongSize) console.error(`  ${p}`);
+      }
+      if (overfull.length) {
+        console.error(red("bridge: more screenshots than the App Store set holds:"));
+        for (const p of overfull) console.error(`  ${p}`);
+        console.error("  Name fewer directories in `bridge.apple.<slot>` (e.g. iphoneduo: { dirs: [outer, inner] }),");
+        console.error("  or give those zdymak targets fewer scenes.");
+      }
       console.error("  Nothing was copied; every destination is untouched.");
       return false;
     }

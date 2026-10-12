@@ -1,14 +1,21 @@
 import { green, red, yellow, LIMITS, VERSION_FIELDS } from "../util.mjs";
 import { reportCrossStore } from "../crossStore.mjs";
 import path from "node:path";
-import { localScreenshots, remoteScreenshots, compareShots, localScreenshotLocales, unknownScreenshotDirs, screenshotBase } from "../screenshots.mjs";
+import { localScreenshots, remoteScreenshots, compareShots, localScreenshotLocales, unknownScreenshotDirs, screenshotBase, duoRequired, DUO_REQUIRED_FROM, IPHONE_TYPES } from "../screenshots.mjs";
 import { centreColours, BLANK_BELOW } from "../blankShot.mjs";
+import { loadCatalog, matchFile, SNAPSHOT_DATE } from "../assetCatalog.mjs";
+import { checkCreative, compareCreative, creativeBase } from "../creative.mjs";
+import { placementsOn } from "../assetLibrary.mjs";
 
 // Verify a listing is submission-complete the CORRECT way — each localization read by id (not the sparse
 // list), char limits, primary-locale coverage, per-platform — and warn on the gotchas before ASC does.
 export async function run(config, client) {
   await client.findApp(config.bundleId);
   const problems = [], notes = [];
+  // Apple's own specifications, read live (a GET) — what sizes each screenshot set and creative slot
+  // takes, and how many files a set holds. The snapshot answers when the API does not, and says so.
+  const catalog = await loadCatalog(client);
+  if (catalog.source !== "live") notes.push(`Apple's asset reference data was not readable (${catalog.why || "no client"}) — sizes checked against the snapshot of ${SNAPSHOT_DATE}`);
   const res = config.resolvedLocales;
   if (res.unsupported.length) notes.push(`UI locales with no App Store listing (fall back to ${config.primaryLocale}): ${res.unsupported.join(", ")}`);
   if (res.invalid?.length) problems.push(`localeMap points at code(s) Apple does not have: ${res.invalid.join(", ")}`);
@@ -106,10 +113,12 @@ export async function run(config, client) {
     const strays = unknownScreenshotDirs(platform, config);
     if (strays.length) notes.push(`${platform}: screenshot folder(s) that are not App Store locale codes, never uploaded: ${strays.join(", ")}`);
 
+    let primaryShots = null; // { local, remote } for the primary locale — the Duo rule below reads it
     for (const code of shotLocales) {
       const loc = locs.find((l) => l.attributes.locale === code);
       if (!loc) continue; // a missing primary localization is already a blocker above
       const remote = await remoteScreenshots(client, loc.id);
+      if (code === config.primaryLocale) primaryShots = { local: localScreenshots(platform, code, config), remote };
       const count = Object.values(remote).reduce((n, m) => n + m.size, 0);
       // Only the primary listing MUST have screenshots — Apple falls back to it for any locale without.
       if (!count && code === config.primaryLocale) problems.push(`${platform}/${code}: no screenshots`);
@@ -138,6 +147,20 @@ export async function run(config, client) {
           }
         }
 
+        // THE SIZE AND THE COUNT, against Apple's catalog. Neither was checked before: a wrong size came back
+        // as a processing failure after upload, and an eleventh file as a refused reservation mid-`fill`,
+        // with the first ten already sent. Duo made both likelier — four accepted sizes, two of them
+        // landscape, and one set of ten shared by two screens.
+        const specs = catalog.screenshotSpecs(dt);
+        if (specs.length) {
+          for (const name of L.keys()) {
+            const m = await matchFile(path.join(screenshotBase(platform, config), code, name), specs);
+            if (m.problem) problems.push(`${platform}/${code}: screenshot ${slot}/${name} — ${m.problem}`);
+          }
+        }
+        const max = catalog.screenshotLimit(dt);
+        if (max != null && L.size > max) problems.push(`${platform}/${code}: screenshots ${slot} has ${L.size} files for a set of ${max} — \`fill\` refuses the set; keep ${max} at most`);
+
         const c = compareShots(L, remote[dt] || new Map());
         if (!c) continue;
         if (c.kind === "count") problems.push(`${platform}/${code}: screenshots ${slot} local ${c.local} / remote ${c.remote} — the store set is not the local one (\`fill\`, VYDANNE_REPLACE=1 to replace)`);
@@ -145,6 +168,27 @@ export async function run(config, client) {
         else if (c.kind === "stale") problems.push(`${platform}/${code}: screenshots ${slot} STALE — ${c.names.length} of ${c.of} differ in content; green would ship the old art (\`fill\`, VYDANNE_REPLACE=1 to replace)`);
         else notes.push(`${platform}/${code}: screenshots ${slot} present, checksum not reported by Apple — content unverified`);
       }
+    }
+
+    if (platform === "IOS") {
+      // IPHONE DUO. Optional today; Apple requires the set from April 2027 for an app built with the iOS
+      // 27.1 SDK or later. So until then a listing that ships on iPhone without one is TOLD rather than
+      // blocked, and from then on it is blocked, because that is what App Store Connect will do — unless
+      // the app says it still builds with an older SDK (VYDANNE_DUO_OPTIONAL=1), which vydanne cannot see.
+      const has = (set, t) => Boolean(set?.[t]?.size);
+      const shots = primaryShots || { local: localScreenshots(platform, config.primaryLocale, config), remote: {} };
+      const onIphone = IPHONE_TYPES.some((t) => has(shots.local, t) || has(shots.remote, t));
+      const duo = has(shots.local, "APP_IPHONE_DUO") || has(shots.remote, "APP_IPHONE_DUO");
+      if (onIphone && !duo) {
+        const where = `${screenshotBase(platform, config)}/${config.primaryLocale}/iphoneduo_*.png (outer 1398×2034, inner 2007×2853 or 2853×2007; one set of up to ten)`;
+        if (duoRequired() && process.env.VYDANNE_DUO_OPTIONAL !== "1") {
+          problems.push(`${platform}/${config.primaryLocale}: no iPhone Duo screenshots — required since ${DUO_REQUIRED_FROM} for apps built with the iOS 27.1 SDK or later: ${where}. An app on an older SDK: VYDANNE_DUO_OPTIONAL=1`);
+        } else {
+          notes.push(`${platform}/${config.primaryLocale}: no iPhone Duo screenshots — optional until ${DUO_REQUIRED_FROM}, then required for apps built with the iOS 27.1 SDK or later: ${where}`);
+        }
+      }
+
+      await creativeChecks(config, client, catalog, locs, problems, notes);
     }
   }
 
@@ -158,4 +202,33 @@ export async function run(config, client) {
   else { console.log(red(`preflight: ${problems.length} blocker(s)`)); problems.forEach((p) => console.log(`  ${red("x")} ${p}`)); }
   notes.forEach((n) => console.log(`  ${yellow("!")} ${n}`));
   return problems.length === 0;
+}
+
+/**
+ * The iOS 27 product page header and search results asset. Optional — an empty slot is a note, never a
+ * blocker — but a local file that is invalid, or that the store does not show, is a blocker on the same
+ * terms as a screenshot: green has to mean the store matches the folder.
+ */
+async function creativeChecks(config, client, catalog, locs, problems, notes) {
+  const { local, plan, problems: invalid } = await checkCreative(config, catalog);
+  for (const p of invalid) problems.push(`IOS/creative ${p}`);
+  if (local.strays.length) notes.push(`IOS/creative: folder(s) in ${local.base} that are not App Store locale codes, never placed: ${local.strays.join(", ")}`);
+  if (!plan.length) {
+    if (!invalid.length) notes.push(`IOS: product page header and search results asset not set (optional; shown on iOS 27 and later) — ${creativeBase(config)}/<locale>/header.png|.mp4 and search.png|.mp4, then \`vydanne creative\``);
+    return;
+  }
+  for (const locale of [...new Set(plan.map((p) => p.locale))]) {
+    const loc = locs.find((l) => l.attributes.locale === locale);
+    if (!loc) { problems.push(`IOS/${locale}: creative assets ready but the version has no ${locale} localization — \`fill\` creates it`); continue; }
+    const placements = await placementsOn(client, loc.id);
+    if (!placements) { notes.push(`IOS/${locale}: the Asset Library placements were not readable with this key — creative assets unchecked`); continue; }
+    for (const f of compareCreative(plan.filter((p) => p.locale === locale), placements)) {
+      const label = f.slot === "header" ? "product page header" : "search results asset";
+      if (f.kind === "missing") problems.push(`IOS/${locale}: ${label} ${path.basename(f.file)} is not on the store (\`vydanne creative --apply\`)`);
+      else if (f.kind === "stale") problems.push(`IOS/${locale}: ${label} STALE — the store shows ${f.name || "another file"}, not ${path.basename(f.file)} (\`creative --apply\`, VYDANNE_REPLACE=1)`);
+      else if (f.kind === "failed") problems.push(`IOS/${locale}: ${label} failed Apple's processing — replace the file`);
+      else if (f.kind === "unverified") notes.push(`IOS/${locale}: ${label} shows ${f.name || "an asset"} placed outside vydanne — content unverified`);
+      else if (f.kind === "remoteOnly") notes.push(`IOS/${locale}: ${label} shows ${f.name || "an asset"} with no local file — left as it is`);
+    }
+  }
 }

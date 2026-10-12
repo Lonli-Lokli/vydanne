@@ -11,9 +11,34 @@ import { VALID } from "./locales.mjs";
 // set invisible to fill, diff AND preflight at once: nothing uploaded, nothing compared, preflight green.
 export const IMAGE_FILE = /\.(png|jpe?g)$/i;
 
-export const IOS_DEVICE = { iphone69: "APP_IPHONE_67", iphone65: "APP_IPHONE_65", ipad13: "APP_IPAD_PRO_3GEN_129", watch: "APP_WATCH_ULTRA" };
+// `iphoneduo` -> APP_IPHONE_DUO, the foldable iPhone, and ONE set for both of its screens.
+//
+// The display type is not in Apple's published OpenAPI (4.5.1 still lists only the older ones), but the
+// live API creates a set with it (HTTP 201, rorkai/App-Store-Connect-CLI#2926, 2026-10-06), and the same
+// change saw a simulator capture at 1398×2034 and 2034×1398 uploaded into it, processed COMPLETE with
+// matching checksums, and shown in App Store Connect's Duo gallery. The inner-screen sizes were never
+// uploaded there, so the evidence that they share the set is Apple's own catalog instead: the Asset
+// Library reference data lists all four sizes under one placement group, IPHONE_DUO_PROFILE, with one
+// limit of ten (see SCREENSHOT_GROUP in assetCatalog.mjs). Outer and inner therefore go into this one
+// set, ten files between them, in filename order — `bridge` names them so the order is the one asked for.
+export const IOS_DEVICE = { iphone69: "APP_IPHONE_67", iphone65: "APP_IPHONE_65", ipad13: "APP_IPAD_PRO_3GEN_129", iphoneduo: "APP_IPHONE_DUO", watch: "APP_WATCH_ULTRA" };
 export const MAC_DEVICE = { macos: "APP_DESKTOP" };
 export const deviceMap = (platform) => (platform === "MAC_OS" ? MAC_DEVICE : IOS_DEVICE);
+
+/**
+ * iPhone Duo screenshots: optional now, required from April 2027 for an app built with the iOS 27.1 SDK
+ * or later (Apple's screenshot specifications, read 2026-10-12).
+ *
+ * A function of the date rather than a constant, so the day the rule changes needs no release: before
+ * it, a listing without them is told they are coming; from it, `preflight` treats them as missing, which
+ * is what App Store Connect will do. vydanne cannot see which SDK a build used, so an app that genuinely
+ * still ships on an older SDK says so with VYDANNE_DUO_OPTIONAL=1 rather than being told it is fine.
+ */
+export const DUO_REQUIRED_FROM = "2027-04-01";
+export const duoRequired = (now = new Date()) => now.getTime() >= Date.parse(`${DUO_REQUIRED_FROM}T00:00:00Z`);
+
+/** The iPhone display types whose presence means the listing ships on iPhone — and so will need a Duo set. */
+export const IPHONE_TYPES = ["APP_IPHONE_67", "APP_IPHONE_65"];
 
 // fastlane's supply convention, which is what most repos already have — but a DEFAULT now, not a law.
 // These two paths were hardcoded, and the docs said so out loud ("symlink them if your layout differs"),

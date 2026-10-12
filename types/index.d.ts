@@ -13,8 +13,8 @@ export type CommandName =
    */
   | 'prepare'
   /**
-   * The whole release pipeline in its one working order: prepare → fill → previews → age-rating →
-   * review-contact → accessibility → preflight. Dry-run without --apply; stops at the first failure;
+   * The whole release pipeline in its one working order: prepare → fill → previews → creative →
+   * age-rating → review-contact → accessibility → preflight. Dry-run without --apply; stops at the first failure;
    * never submits — Add to Review and Submit stay manual.
    */
   | 'push'
@@ -29,6 +29,13 @@ export type CommandName =
   | 'accessibility'
   | 'privacy'
   | 'previews'
+  /**
+   * The iOS 27 product page header and search results asset, from `<creative.dir>/<locale>/header.*` and
+   * `search.*`: validated against Apple's live catalog, uploaded once into the app's Asset Library and
+   * placed on each localization of the version being prepared. Optional; a no-op without local files.
+   * Dry run without --apply; VYDANNE_REPLACE=1 replaces a slot that shows something else.
+   */
+  | 'creative'
   | 'iap'
   | 'compliance'
   /**
@@ -192,18 +199,52 @@ export type PlayImageType =
   | "wearScreenshots"
   | "tvScreenshots";
 
+/**
+ * Several zdymak directories merged into ONE App Store set — the shape of the iPhone Duo slot, whose outer
+ * and inner screens Apple holds together (one set of ten). Every listed directory that exists is carried,
+ * renamed so `fill`'s filename order is the order asked for.
+ */
+export interface MergedSlot {
+  /** Directory names, in rank order. Default for `iphoneduo`: the outer, inner and inner-landscape targets. */
+  dirs: string[];
+  /**
+   * 'display' (default): every outer shot, then every inner one. 'scene': interleaved, scene by scene.
+   * Apple has not documented how a mixed Duo set is shown, so this is the app's call.
+   */
+  order?: "display" | "scene";
+}
+
 /** Where `bridge` reads zdymak's output from, and which directory feeds which store slot. */
 export interface BridgeConfig {
   /** zdymak's output root. Read from zdymak.config.mjs when absent; './store-assets' otherwise. */
   out?: string;
   /**
    * Screenshot slot token -> the zdymak output directory it comes from (a name, or names in
-   * preference order). Defaults cover zdymak's own target names; override when `dir:` in
+   * preference order — the first that exists wins), or a `MergedSlot` to carry several into one set
+   * (`iphoneduo` is one by default). Defaults cover zdymak's own target names; override when `dir:` in
    * zdymak.config.mjs makes the directory name differ from the target name.
    */
-  apple?: Record<string, string | string[]>;
+  apple?: Record<string, string | string[] | MergedSlot>;
   /** Play image type -> the zdymak output directory it comes from. Same shape and reason. */
   play?: Partial<Record<PlayImageType, string | string[]>>;
+}
+
+/**
+ * The iOS 27 product page header and search results asset (`vydanne creative`).
+ *
+ * Files: `<dir>/<ASC-locale>/header.<png|jpg|jpeg|mp4|m4v|mov>` and `search.<…>`, one per slot. Sizes, as
+ * Apple's catalog had them on 2026-10-12 (the live catalog is what is checked): header image 5244×2950 PNG
+ * (universal) or 3840×1646 PNG, header video 3840×1646 at 30 or 60 fps, 5–30 s; search image 5244×2950
+ * PNG (universal) or 3:2 from 1920×1280 to 3840×2560 (PNG/JPEG), search video 3:2 in the same range at 30
+ * or 60 fps, 5–30 s. No alpha.
+ */
+export interface CreativeConfig {
+  /** Default 'fastlane/creative'. */
+  dir?: string;
+  /** Place a universal (5244×2950 PNG) header in search results too, for a locale with no search.* file. */
+  searchFromHeader?: boolean;
+  /** A video's preview frame, 'HH:MM:SS:FF'. Apple picks one when absent. */
+  poster?: string;
 }
 
 /** Overrides for the App Review contact. The PII itself stays in gitignored .txt files. */
@@ -329,6 +370,8 @@ export interface VydanneConfig {
   privacy?: PrivacyConfig;
   iaps?: IapConfig[];
   previews?: PreviewSpec[];
+  /** The iOS 27 product page header and search results asset — see CreativeConfig. */
+  creative?: CreativeConfig;
   export?: ExportConfig;
   /** What the app actually supports, for the Accessibility Nutrition Labels. Required by that command. */
   accessibility?: AccessibilityConfig;
@@ -507,7 +550,10 @@ export declare const UI_TO_ASC: Record<string, string>;
 export declare const CONFIG_KEYS: readonly string[];
 export declare const COMMAND_NAMES: readonly CommandName[];
 
-/** Screenshot filename prefix -> ASC display type, per platform. */
+/**
+ * Screenshot filename prefix -> ASC display type, per platform. `iphoneduo` -> 'APP_IPHONE_DUO' holds both
+ * of the foldable iPhone's screens in one set.
+ */
 export declare const IOS_DEVICE: Record<string, string>;
 export declare const MAC_DEVICE: Record<string, string>;
 export declare const DEFAULT_SCREENSHOT_BASE: { IOS: string; MAC_OS: string };

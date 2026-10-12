@@ -5,6 +5,9 @@ import { VALID } from "../locales.mjs";
 import { md5 } from "../upload.mjs";
 import { localScreenshots, remoteScreenshots, compareShots, localScreenshotLocales } from "../screenshots.mjs";
 import { appStoreNotesFile } from "../notes.mjs";
+import { loadCatalog } from "../assetCatalog.mjs";
+import { checkCreative, compareCreative } from "../creative.mjs";
+import { placementsOn } from "../assetLibrary.mjs";
 
 // [asc attribute, local metadata filename, isLongText]
 const VERSION_FIELDS = [
@@ -80,10 +83,11 @@ export async function run(config, client) {
     if (extra.length) console.log(`  ${yellow("remote-only locales")} (no local folder): ${extra.join(", ")}`);
 
     actionable += await mediaDiff(config, client, platform, verLocs);
+    if (platform === "IOS") actionable += await creativeDiff(config, client, verLocs);
   }
 
   console.log();
-  console.log(actionable ? yellow(`${actionable} actionable difference(s) — run \`fill\` / \`previews\` to sync`) : green("in sync — local matches App Store Connect"));
+  console.log(actionable ? yellow(`${actionable} actionable difference(s) — run \`fill\` / \`previews\` / \`creative\` to sync`) : green("in sync — local matches App Store Connect"));
   return true;
 }
 
@@ -154,6 +158,36 @@ async function mediaDiff(config, client, platform, verLocs) {
         diffs++;
         console.log(`${label}: differs in content (${path.basename(spec.file)})  (@${config.primaryLocale})`);
       }
+    }
+  }
+  return diffs;
+}
+
+/**
+ * The product page header and search results asset: local `<creative.dir>/<locale>/` against each
+ * localization's Asset Library placements, by the md5 `creative` writes into the asset's reference name
+ * (the library keeps no checksum). Only locales with local files are compared — the slots are optional,
+ * and a store asset with no local file is reported, never counted, because nothing would remove it.
+ */
+async function creativeDiff(config, client, verLocs) {
+  const { plan, problems } = await checkCreative(config, await loadCatalog(client));
+  let diffs = 0;
+  for (const p of problems) {
+    diffs++;
+    console.log(`  ${yellow("creative")} invalid locally: ${p}  (\`preflight\` and \`creative\` refuse it)`);
+  }
+  for (const locale of [...new Set(plan.map((p) => p.locale))]) {
+    const loc = verLocs.find((l) => l.attributes.locale === locale);
+    if (!loc) { diffs++; console.log(`  ${yellow("creative")}: no ${locale} localization to place on  (@${locale})`); continue; }
+    const placements = await placementsOn(client, loc.id);
+    if (!placements) { console.log(`  ${yellow("creative")}: Asset Library placements not readable with this key  (@${locale})`); continue; }
+    for (const f of compareCreative(plan.filter((p) => p.locale === locale), placements)) {
+      const label = `  ${yellow("creative")} ${f.slot}`;
+      if (f.kind === "missing") { diffs++; console.log(`${label}: local ${path.basename(f.file)} / store none  (@${locale})`); }
+      else if (f.kind === "stale") { diffs++; console.log(`${label}: store shows ${f.name || "another file"}, local is ${path.basename(f.file)} — differs in content  (@${locale})`); }
+      else if (f.kind === "failed") { diffs++; console.log(`${label}: the store's asset failed processing  (@${locale})`); }
+      else if (f.kind === "unverified") console.log(`${label}: store shows ${f.name || "an asset"} placed outside vydanne — content unverified  (@${locale})`);
+      else console.log(`${label}: store shows ${f.name || "an asset"}, no local file  (@${locale})`);
     }
   }
   return diffs;

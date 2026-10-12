@@ -20,17 +20,27 @@ export async function uploadAsset(client, { type, setType, setId, filePath }) {
   });
   if (reserve.status >= 300) throw new Error(`reserve ${type} ${reserve.status}: ${JSON.stringify(reserve.json).slice(0, 200)}`);
   const asset = reserve.json.data;
-  for (const op of asset.attributes.uploadOperations || []) {
-    const headers = {};
-    for (const h of op.requestHeaders || []) headers[h.name] = h.value;
-    const r = await fetch(op.url, { method: op.method, headers, body: bytes.subarray(op.offset, op.offset + op.length) });
-    if (r.status >= 300) throw new Error(`upload op ${r.status} for ${path.basename(filePath)}`);
-  }
+  await putUploadOperations(asset.attributes.uploadOperations, bytes, path.basename(filePath));
   const commit = await client.patch(`/v1/${type}/${asset.id}`, {
     data: { type, id: asset.id, attributes: { uploaded: true, sourceFileChecksum: md5(bytes) } },
   });
   if (commit.status >= 300) throw new Error(`commit ${type} ${commit.status}: ${JSON.stringify(commit.json).slice(0, 200)}`);
   return asset.id;
+}
+
+/**
+ * Send the bytes to the pre-signed URLs a reservation handed back. Shared by the set-based upload above
+ * and the Asset Library one (assetLibrary.mjs): the reservation and the commit differ, this step does not.
+ * The URLs are unauthenticated and time-limited, so this is plain `fetch` rather than the ASC client — and
+ * a dry run never gets here with any, because a withheld reservation returns no operations.
+ */
+export async function putUploadOperations(ops, bytes, label) {
+  for (const op of ops || []) {
+    const headers = {};
+    for (const h of op.requestHeaders || []) headers[h.name] = h.value;
+    const r = await fetch(op.url, { method: op.method, headers, body: bytes.subarray(op.offset, op.offset + op.length) });
+    if (r.status >= 300) throw new Error(`upload op ${r.status} for ${label}`);
+  }
 }
 
 // Previews process asynchronously — poll until Apple exposes videoUrl, then set the poster frame.

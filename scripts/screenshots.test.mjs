@@ -35,3 +35,19 @@ test('a store set matching the local one name for name and byte for byte is stil
   const remote = await remoteScreenshots(storeWith([{ type: 'APP_IPHONE_DUO', files }]), 'loc');
   assert.equal(compareShots(new Map(files), remote.APP_IPHONE_DUO), null);
 });
+
+// `fill` with VYDANNE_REPLACE=1 keeps a set the store already shows, and only that: same files, same bytes, same
+// order, each proved by Apple's checksum. Anything less is replaced, as before.
+test('matchesStore keeps only a set the store proves it already shows', async () => {
+  const { matchesStore } = await import('../src/commands/fill.mjs');
+  const shots = new Map([['a', { fileName: 'x_1.png', sourceFileChecksum: 'm1' }], ['b', { fileName: 'x_2.png', sourceFileChecksum: 'm2' }]]);
+  const refs = [{ id: 'a' }, { id: 'b' }];
+  const local = [['x_1.png', 'm1'], ['x_2.png', 'm2']];
+  assert.equal(matchesStore(refs, shots, local), true);
+  assert.equal(matchesStore(refs, shots, [['x_1.png', 'm1'], ['x_2.png', 'new']]), false, 'new bytes');
+  assert.equal(matchesStore([{ id: 'b' }, { id: 'a' }], shots, local), false, 'another order');
+  assert.equal(matchesStore(refs, shots, [...local, ['x_3.png', 'm3']]), false, 'a file more');
+  assert.equal(matchesStore([...refs, { id: 'gone' }], shots, local), false, 'a shot not included');
+  const unproved = new Map([...shots, ['b', { fileName: 'x_2.png', sourceFileChecksum: null }]]);
+  assert.equal(matchesStore(refs, unproved, local), false, 'no checksum from Apple');
+});

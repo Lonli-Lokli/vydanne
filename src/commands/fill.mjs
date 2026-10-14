@@ -2,9 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { green, yellow, red } from "../util.mjs";
 import { VALID } from "../locales.mjs";
-import { uploadAsset } from "../upload.mjs";
+import { uploadAsset, md5 } from "../upload.mjs";
 import { reportCrossStore } from "../crossStore.mjs";
-import { deviceMap, screenshotBase, IMAGE_FILE } from "../screenshots.mjs";
+import { deviceMap, screenshotBase, IMAGE_FILE, compareShots } from "../screenshots.mjs";
 import { appStoreNotesFile } from "../notes.mjs";
 import { loadCatalog } from "../assetCatalog.mjs";
 
@@ -209,6 +209,7 @@ async function uploadScreenshots(config, client, platform, verLocs) {
     // which is the tool telling the user to do its job. Name the files instead.
     if (unknown.length) console.log(yellow(`    ${code}: ${unknown.length} file(s) with no device prefix, not uploaded: ${unknown.slice(0, 3).join(", ")}${unknown.length > 3 ? ", …" : ""} (known: ${Object.keys(DEV).join(", ")})`));
     const { json: sets } = await client.get(`/v1/appStoreVersionLocalizations/${loc.id}/appScreenshotSets?include=appScreenshots&limit=50`);
+    const shotsById = new Map((sets.included || []).filter((r) => r.type === "appScreenshots").map((r) => [r.id, r.attributes || {}]));
     for (const [dt, list] of Object.entries(byDev)) {
       const max = catalog.screenshotLimit(dt);
       if (max != null && list.length > max) {
@@ -226,6 +227,13 @@ async function uploadScreenshots(config, client, platform, verLocs) {
         console.log(yellow(`    ${code}/${dt}: already has ${existing.length}, skipping (set VYDANNE_REPLACE=1 to replace)`));
         continue;
       }
+      // A set the store already shows, file for file, in the same order, is kept: replacing every set re-sent Niva's
+      // twenty-one iPad sets (210 deletes and 210 uploads) when only the iPhone and Duo art had changed (2026-10-14).
+      // Only a match Apple's checksums prove counts; a shot with no checksum is replaced as before.
+      if (existing.length && matchesStore(existing, shotsById, list.map((f) => [f, md5(fs.readFileSync(path.join(base, code, f)))]))) {
+        console.log(green(`    ${code}/${dt}: ${list.length} screenshots, already on the store, kept`));
+        continue;
+      }
       for (const s of existing) { // VYDANNE_REPLACE: drop the old shots so the new upload takes their place
         await client.del(`/v1/appScreenshots/${s.id}`);
         console.log(yellow(`    ${code}/${dt}: ${client.dryRun ? "would remove" : "removed"} old screenshot ${s.id}`));
@@ -236,4 +244,13 @@ async function uploadScreenshots(config, client, platform, verLocs) {
     }
   }
   return ok;
+}
+
+/** True when a store set holds exactly these files (name and md5), in this order, each proved by Apple's checksum. */
+export function matchesStore(existing, shotsById, local) {
+  const remote = existing.map((ref) => shotsById.get(ref.id));
+  if (remote.some((a) => !a)) return false;
+  const names = remote.map((a) => a.fileName);
+  if (names.join("\n") !== local.map(([f]) => f).join("\n")) return false;
+  return compareShots(new Map(local), new Map(remote.map((a) => [a.fileName, a.sourceFileChecksum ?? null]))) === null;
 }

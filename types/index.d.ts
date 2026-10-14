@@ -86,7 +86,10 @@ export interface PreviewSpec {
   type: string;
   /** Path to the .mp4 (from zdymak). */
   file: string;
-  /** Poster frame, 'HH:MM:SS:FF'. */
+  /**
+   * Poster frame, 'HH:MM:SS:FF'. Optional: without it Apple picks its own frame. When set, `previews` waits for the
+   * poster image Apple makes from it and fails if none arrives (an empty one shows as a tile that never loads).
+   */
   poster?: string;
   /** ASC locale codes to attach the preview to; defaults to the primary locale. */
   locales?: string[];

@@ -43,20 +43,69 @@ export async function putUploadOperations(ops, bytes, label) {
   }
 }
 
-// Previews process asynchronously — poll until Apple exposes videoUrl, then set the poster frame.
-export async function setPreviewPoster(client, previewId, frameTimeCode, { tries = 30, delayMs = 15000 } = {}) {
-  // In a dry run the preview was never created, so `previewId` is a synthetic `dry-run-<n>` and this would
-  // poll a 404 for seven and a half minutes before giving up.
-  if (client.dryRun) return true;
-  for (let i = 0; i < tries; i++) {
-    const { json } = await client.get(`/v1/appPreviews/${previewId}`);
-    if (json.data?.attributes?.videoUrl) {
-      await client.patch(`/v1/appPreviews/${previewId}`, {
-        data: { type: "appPreviews", id: previewId, attributes: { previewFrameTimeCode: frameTimeCode } },
-      });
-      return true;
+/**
+ * Wait for uploaded App Previews to finish processing, set each one's poster frame where `poster` asks for one, and
+ * wait for Apple's poster IMAGE before calling it done. App Store Connect shows a preview with no image as a tile that
+ * never loads: Niva's 1.7 previews sat like that in four languages after their poster was set to 8 s, each reading
+ * `COMPLETE` with a 0×0 image, while the one language whose poster was never set had Apple's own frame and an image
+ * (2026-10-14). A preview with no `poster` keeps Apple's frame (about 5 s in) and is only waited on.
+ *
+ * All the uploads are waited on together, because Apple processes them in parallel; waiting on each before the next
+ * upload kept a 21-language run going long enough to be cut off after five languages.
+ *
+ * `items` are `{ id, label, poster? }`; returns one `{ ...item, ok, why?, frame? }` each.
+ */
+export async function finishPreviews(client, items, { deadlineMs = 30 * 60_000, posterWaitMs = 6 * 60_000, delayMs = 15000, now = Date.now, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
+  const t0 = now();
+  const left = new Map(items.map((it) => [it.id, { ...it, phase: "processing" }]));
+  const done = [];
+  const finish = (it, result) => { left.delete(it.id); done.push({ id: it.id, label: it.label, poster: it.poster, ...result }); };
+  while (left.size) {
+    for (const it of [...left.values()]) {
+      const { json } = await client.get(`/v1/appPreviews/${it.id}`);
+      const a = json?.data?.attributes ?? {};
+      const delivery = a.assetDeliveryState?.state;
+      if (delivery === "FAILED") {
+        const errs = (a.assetDeliveryState.errors || []).map((e) => e.description || e.code).join("; ");
+        finish(it, { ok: false, why: `Apple could not process it${errs ? `: ${errs}` : ""}` });
+        continue;
+      }
+      if (!a.videoUrl) continue; // still processing
+      const image = a.previewImage?.width > 0 ? a.previewImage.templateUrl : null;
+      if (it.poster && it.phase === "processing") {
+        const r = await client.patch(`/v1/appPreviews/${it.id}`, {
+          data: { type: "appPreviews", id: it.id, attributes: { previewFrameTimeCode: it.poster } },
+        });
+        if (r.status >= 300) {
+          finish(it, { ok: false, why: `poster ${it.poster} refused (${r.status}): ${JSON.stringify(r.json?.errors?.[0]?.detail ?? r.json).slice(0, 160)}` });
+          continue;
+        }
+        // The image Apple had before belongs to its own frame; only a new one is the poster that was asked for.
+        Object.assign(it, { phase: "poster", before: image, posterAt: now() });
+        continue;
+      }
+      const isNew = it.phase !== "poster" || image !== it.before;
+      if (image && isNew && (!it.poster || a.previewFrameTimeCode === it.poster)) {
+        finish(it, { ok: true, frame: a.previewFrameTimeCode });
+        continue;
+      }
+      if (it.phase === "poster" && now() - it.posterAt > posterWaitMs) {
+        finish(it, {
+          ok: false,
+          why: `no poster image ${Math.round(posterWaitMs / 60_000)} min after its poster was set to ${it.poster} `
+            + `(Apple reports the frame ${a.previewFrameImage?.state?.state ?? "unknown"}, image ${a.previewImage?.width ?? 0}×${a.previewImage?.height ?? 0}), `
+            + "so App Store Connect shows a tile that never loads. Leave `poster` out to keep Apple's own frame, and upload again with VYDANNE_REPLACE=1.",
+        });
+      }
     }
-    await new Promise((r) => setTimeout(r, delayMs));
+    if (!left.size) break;
+    if (now() - t0 > deadlineMs) {
+      for (const it of [...left.values()]) {
+        finish(it, { ok: false, why: `${it.phase === "poster" ? "no poster image" : "still processing"} after ${Math.round(deadlineMs / 60_000)} min` });
+      }
+      break;
+    }
+    await sleep(delayMs);
   }
-  return false;
+  return done;
 }

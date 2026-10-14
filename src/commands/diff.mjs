@@ -136,27 +136,35 @@ async function mediaDiff(config, client, platform, verLocs) {
   // one-local-vs-one-remote reads "in sync" however different the videos are, so a re-rendered App
   // Preview reported nothing to do. `uploadAsset` commits md5(bytes) as sourceFileChecksum for
   // previews exactly as it does for screenshots, so the same comparison is available for free.
-  const { json: psets } = await client.get(`/v1/appStoreVersionLocalizations/${primary.id}/appPreviewSets?include=appPreviews&limit=50`);
-  const prevById = new Map((psets.included || []).filter((r) => r.type === "appPreviews").map((r) => [r.id, r.attributes || {}]));
-  const remotePrev = {};
-  for (const s of psets.data || []) {
-    remotePrev[s.attributes.previewType] = (s.relationships?.appPreviews?.data || [])
-      .map((ref) => prevById.get(ref.id)?.sourceFileChecksum ?? null);
-  }
-  for (const spec of (config.previews || []).filter((s) => s.platform === platform && (s.locales || []).includes(config.primaryLocale))) {
-    const file = path.resolve(spec.file);
-    const L = fs.existsSync(file) ? 1 : 0;
-    const R = remotePrev[spec.type] || [];
-    const label = `  ${yellow("preview")} ${spec.type}`;
-    if (L !== R.length) {
-      diffs++;
-      console.log(`${label}: local ${L} / remote ${R.length}  (@${config.primaryLocale})`);
-    } else if (L === 1) {
-      if (R.every((sum) => sum === null)) {
-        console.log(`${label}: present, checksum not reported by Apple — content unverified`);
-      } else if (!R.includes(md5(fs.readFileSync(file)))) {
+  // Every locale a spec names, not just the primary: Niva (2026-10-14) had a preview in 5 of its 21
+  // configured locales, and a primary-only comparison reported "in sync" about the other sixteen.
+  const specs = (config.previews || []).filter((s) => s.platform === platform);
+  const prevLocales = [...new Set(specs.flatMap((s) => s.locales || [config.primaryLocale]))];
+  for (const code of prevLocales) {
+    const loc = verLocs.find((l) => l.attributes.locale === code);
+    if (!loc) continue;
+    const { json: psets } = await client.get(`/v1/appStoreVersionLocalizations/${loc.id}/appPreviewSets?include=appPreviews&limit=50`);
+    const prevById = new Map((psets.included || []).filter((r) => r.type === "appPreviews").map((r) => [r.id, r.attributes || {}]));
+    const remotePrev = {};
+    for (const s of psets.data || []) {
+      remotePrev[s.attributes.previewType] = (s.relationships?.appPreviews?.data || [])
+        .map((ref) => prevById.get(ref.id)?.sourceFileChecksum ?? null);
+    }
+    for (const spec of specs.filter((s) => (s.locales || [config.primaryLocale]).includes(code))) {
+      const file = path.resolve(spec.file);
+      const L = fs.existsSync(file) ? 1 : 0;
+      const R = remotePrev[spec.type] || [];
+      const label = `  ${yellow("preview")} ${spec.type}`;
+      if (L !== R.length) {
         diffs++;
-        console.log(`${label}: differs in content (${path.basename(spec.file)})  (@${config.primaryLocale})`);
+        console.log(`${label}: local ${L} / remote ${R.length}  (@${code})`);
+      } else if (L === 1) {
+        if (R.every((sum) => sum === null)) {
+          console.log(`${label}: present, checksum not reported by Apple — content unverified  (@${code})`);
+        } else if (!R.includes(md5(fs.readFileSync(file)))) {
+          diffs++;
+          console.log(`${label}: differs in content (${path.basename(spec.file)})  (@${code})`);
+        }
       }
     }
   }

@@ -1,10 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { green, yellow, red } from "../util.mjs";
-import { uploadAsset, setPreviewPoster } from "../upload.mjs";
+import { uploadAsset, finishPreviews } from "../upload.mjs";
 
-// Upload App Preview videos natively (reserve → chunked PUT → commit → poll processing → poster frame).
-// config.previews: [{ platform, type, file, poster, locales }]. Skips locales that already have a preview.
+// Upload App Preview videos natively (reserve → chunked PUT → commit), then wait for all of them together: processing,
+// the poster frame where `poster` names one, and the poster image (`finishPreviews`). config.previews:
+// [{ platform, type, file, poster?, locales }]. Skips locales that already have a preview.
 //
 // EVERY failure below is recorded, not just printed. This command used to `return true` unconditionally:
 // each error path printed red and `continue`d, so a rejected upload was indistinguishable from a clean
@@ -17,6 +18,7 @@ export async function run(config, client) {
   await client.findApp(config.bundleId);
   const specs = config.previews || defaultSpecs(config);
   const failures = [];
+  const sent = []; // uploads waiting for Apple: { id, label, poster }
   // defaultSpecs filters to files that exist, so with no `previews` config and no video on disk this
   // command used to print NOTHING and exit 0 — indistinguishable from a successful upload in a CI log.
   // Not a failure: an app with no previews is a normal app, and `push` must not stall on one.
@@ -65,11 +67,20 @@ export async function run(config, client) {
         }
         console.log(`  ${s.platform}/${code}/${s.type}: ${client.dryRun ? "would upload" : "uploading"} ${path.basename(file)}...`);
         const id = await uploadAsset(client, { type: "appPreviews", setType: "appPreviewSet", setId: set.id, filePath: file });
-        await setPreviewPoster(client, id, s.poster);
-        if (!client.dryRun) console.log(green(`    done ${s.platform}/${code}/${s.type}`));
+        if (!client.dryRun) sent.push({ id, label: `${s.platform}/${code}/${s.type}`, poster: s.poster });
       } catch (e) {
         console.error(red(`    error ${s.platform}/${code}/${s.type}: ${e.message}`));
         failures.push(`${s.platform}/${code}/${s.type}: ${e.message}`);
+      }
+    }
+  }
+  if (sent.length) {
+    console.log(`  waiting for Apple to process ${sent.length} preview(s) and draw their posters…`);
+    for (const r of await finishPreviews(client, sent)) {
+      if (r.ok) console.log(green(`    done ${r.label} (poster at ${r.frame})`));
+      else {
+        console.error(red(`    error ${r.label}: ${r.why}`));
+        failures.push(`${r.label}: ${r.why}`);
       }
     }
   }
@@ -79,6 +90,35 @@ export async function run(config, client) {
     return false;
   }
   return true;
+}
+
+/**
+ * What preflight asks of the previews `config.previews` names, for one platform's version: that every configured
+ * locale has its preview, processed, with a poster image. Preflight never looked at previews, so Niva's 1.7 went to
+ * review with them in five of 21 languages and four of those showing a tile that never loads (2026-10-14).
+ */
+export async function previewProblems(client, config, platform, locs) {
+  const problems = [];
+  for (const s of (config.previews || []).filter((x) => x.platform === platform)) {
+    for (const code of s.locales || [config.primaryLocale]) {
+      const loc = locs.find((l) => l.attributes.locale === code);
+      if (!loc) continue; // a missing localization is reported with the listing
+      const { json } = await client.get(`/v1/appStoreVersionLocalizations/${loc.id}/appPreviewSets?include=appPreviews&limit=50`);
+      const set = (json?.data || []).find((x) => x.attributes.previewType === s.type);
+      const ids = new Set((set?.relationships?.appPreviews?.data || []).map((d) => d.id));
+      const previews = (json?.included || []).filter((x) => x.type === "appPreviews" && ids.has(x.id));
+      const label = `${platform}/${code}/${s.type}`;
+      if (!previews.length) { problems.push(`${label}: no App Preview — \`vydanne previews --apply\``); continue; }
+      for (const p of previews) {
+        const a = p.attributes;
+        if (a.assetDeliveryState?.state !== "COMPLETE") problems.push(`${label}: preview ${a.assetDeliveryState?.state ?? "not processed"}`);
+        else if (!(a.previewImage?.width > 0)) {
+          problems.push(`${label}: preview has no poster image (frame ${a.previewFrameTimeCode}), so App Store Connect shows a tile that never loads — upload again with VYDANNE_REPLACE=1 \`vydanne previews --apply\`, without \`poster\` if one was set`);
+        }
+      }
+    }
+  }
+  return problems;
 }
 
 function defaultSpecs(config) {

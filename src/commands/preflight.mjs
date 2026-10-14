@@ -6,6 +6,7 @@ import { centreColours, BLANK_BELOW } from "../blankShot.mjs";
 import { loadCatalog, matchFile, SNAPSHOT_DATE } from "../assetCatalog.mjs";
 import { checkCreative, compareCreative, creativeBase } from "../creative.mjs";
 import { placementsOn } from "../assetLibrary.mjs";
+import { previewProblems } from "./previews.mjs";
 
 // Verify a listing is submission-complete the CORRECT way — each localization read by id (not the sparse
 // list), char limits, primary-locale coverage, per-platform — and warn on the gotchas before ASC does.
@@ -97,6 +98,9 @@ export async function run(config, client) {
         else if (LIMITS[f] && val.length > LIMITS[f]) problems.push(`${platform}/${code}: ${f} ${val.length}>${LIMITS[f]}`);
       }
     }
+
+    // The previews the config names: present in each of their locales, processed, and with a poster image.
+    problems.push(...await previewProblems(client, config, platform, locs));
 
     // EVERY locale with a local screenshot folder, not just the primary one.
     //

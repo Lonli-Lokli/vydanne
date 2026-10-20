@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describeTracks, parseTracks } from '../src/play/tracks.mjs';
+import { bundle } from './aab-fixture.mjs';
 import { run } from '../src/play/commands/prerelease.mjs';
 
 test('one name, a comma list or an array, trimmed and without repeats', () => {
@@ -17,16 +18,16 @@ test('one name, a comma list or an array, trimmed and without repeats', () => {
   assert.equal(describeTracks(['alpha', 'internal']), '"alpha", "internal"');
 });
 
-/** A repo with a bundle (unreadable on purpose: Play's answer is then the versionCode) and next.txt notes. */
+/** A repo with a bundle (no versionCode on purpose) and next.txt notes. */
 function repo() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vydanne-tracks-'));
   fs.mkdirSync(path.join(dir, 'dist'));
-  fs.writeFileSync(path.join(dir, 'dist', 'app-1.0-7.aab'), 'not a real bundle');
+  bundle(path.join(dir, 'dist'), 'app.example.tracks'); // readable id, no versionCode: Play's answer is then the versionCode
   for (const locale of ['en-GB', 'de-DE']) {
     fs.mkdirSync(path.join(dir, 'meta', locale, 'changelogs'), { recursive: true });
     fs.writeFileSync(path.join(dir, 'meta', locale, 'changelogs', 'next.txt'), `What changed (${locale}).`);
   }
-  const config = { google: { aab: path.join(dir, 'dist'), metadataDir: path.join(dir, 'meta'), defaultLocale: 'en-GB' } };
+  const config = { google: { packageName: 'app.example.tracks', aab: path.join(dir, 'dist'), metadataDir: path.join(dir, 'meta'), defaultLocale: 'en-GB' } };
   return { dir, config };
 }
 

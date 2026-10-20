@@ -43,7 +43,7 @@ function zipOf(name, data) {
 }
 
 function bundle(dir, versionCode, versionName) {
-  const element = Buffer.concat([field(1, attribute('versionCode', String(versionCode))), field(1, attribute('versionName', versionName))]);
+  const element = Buffer.concat([field(3, Buffer.from('manifest')), field(4, Buffer.concat([field(1, Buffer.alloc(0)), field(2, Buffer.from('package')), field(3, Buffer.from('app.example.notes'))])), field(1, attribute('versionCode', String(versionCode))), field(1, attribute('versionName', versionName))]);
   const file = path.join(dir, `app-${versionName}-${versionCode}.aab`);
   fs.writeFileSync(file, zipOf('base/manifest/AndroidManifest.xml', field(1, element)));
   return file;
@@ -106,7 +106,7 @@ test('a version file is never renamed after a real upload', async () => {
   const { log } = console;
   console.log = () => {};
   try {
-    assert.equal(await run({ google: { aab: path.join(root, 'dist'), metadataDir: meta, defaultLocale: 'en-GB', track: 'internal' } }, client), true);
+    assert.equal(await run({ google: { packageName: 'app.example.notes', aab: path.join(root, 'dist'), metadataDir: meta, defaultLocale: 'en-GB', track: 'internal' } }, client), true);
   } finally {
     console.log = log;
     if (saved !== undefined) process.env.VYDANNE_TRACK = saved;

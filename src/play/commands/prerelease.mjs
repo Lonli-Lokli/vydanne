@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { green, yellow, red } from "../../util.mjs";
-import { readAabVersionCode, readAabVersionName } from "../aab.mjs";
+import { readAabPackage, readAabVersionCode, readAabVersionName } from "../aab.mjs";
+import { buildIdProblem } from "../../build-id.mjs";
 import { PRODUCTION, describeTracks, parseTracks } from "../tracks.mjs";
 
 // The one track this command refuses is PRODUCTION (../tracks.mjs). Everything else is passed through.
@@ -51,6 +52,13 @@ export async function run(config, client) {
   const aab = resolveAab(g.aab);
   if (!aab) {
     console.error(red("prerelease: no .aab found — set `google.aab` in the config, or pass VYDANNE_AAB=<path>."));
+    return false;
+  }
+  // The bundle's own id must be the package this config uploads: a debug or staging variant (another id)
+  // is refused here, the one place every Play upload passes, before any network call. No bypass.
+  const idProblem = buildIdProblem("bundle", readAabPackage(aab), g.packageName);
+  if (idProblem) {
+    console.error(red(`prerelease: refusing: ${idProblem}`));
     return false;
   }
   console.log(green(`prerelease → ${onTracks}`));

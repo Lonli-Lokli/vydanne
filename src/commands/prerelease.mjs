@@ -3,6 +3,7 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { green, yellow, red } from "../util.mjs";
+import { buildIdProblem } from "../build-id.mjs";
 
 const run_ = promisify(execFile);
 
@@ -100,13 +101,22 @@ async function appBuilds(client) {
  * `xcrun altool`.
  */
 async function ipaBuildNumber(ipa) {
+  return ipaPlistKey(ipa, "CFBundleVersion");
+}
+
+/** The CFBundleIdentifier inside the .ipa, read the same way. Null when it cannot be read. */
+export async function ipaBundleId(ipa) {
+  return ipaPlistKey(ipa, "CFBundleIdentifier");
+}
+
+async function ipaPlistKey(ipa, key) {
   try {
     const { stdout } = await run_(
       "/bin/sh",
       ["-c", `unzip -p ${JSON.stringify(ipa)} 'Payload/*.app/Info.plist' | plutil -convert json -o - -`],
       { maxBuffer: 32 * 1024 * 1024 },
     );
-    return JSON.parse(stdout).CFBundleVersion ?? null;
+    return JSON.parse(stdout)[key] ?? null;
   } catch {
     return null;
   }
@@ -134,6 +144,14 @@ export async function run(config, client, credentials) {
   if (!ipa) {
     console.error(red("prerelease: no .ipa found — set `ios.ipa` in the config, or pass VYDANNE_IPA=<path>."));
     console.error("  It may be a file or a directory; a directory takes its newest .ipa.");
+    return false;
+  }
+
+  // The archive's own id must be the bundle id this config uploads: a debug or staging variant (another
+  // id) is refused here, the one place every TestFlight upload passes, before any network call. No bypass.
+  const idProblem = buildIdProblem("archive", await ipaBundleId(ipa), config.bundleId);
+  if (idProblem) {
+    console.error(red(`prerelease: refusing: ${idProblem}`));
     return false;
   }
 

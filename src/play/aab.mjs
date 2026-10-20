@@ -48,6 +48,32 @@ export function readAabVersionName(file) {
   }
 }
 
+/**
+ * The applicationId out of an `.aab`: the `package` attribute (empty namespace) of the `<manifest>`
+ * element in `base/manifest/AndroidManifest.xml`. Walks aapt2's protobuf by field number: XmlNode.element
+ * = 1; XmlElement.name = 3, .attribute = 4; XmlAttribute.namespace_uri = 1, .name = 2, .value = 3.
+ * Null when the bundle cannot be read, so the caller decides what an unreadable bundle means.
+ */
+export function readAabPackage(file) {
+  try {
+    const manifest = zipEntry(fs.readFileSync(file), "base/manifest/AndroidManifest.xml");
+    if (!manifest) return null;
+    const element = protoFields(manifest).find((f) => f.no === 1 && f.wire === 2);
+    if (!element) return null;
+    const parts = protoFields(element.bytes);
+    if (parts.find((f) => f.no === 3 && f.wire === 2)?.bytes.toString("utf8") !== "manifest") return null;
+    for (const f of parts) {
+      if (f.no !== 4 || f.wire !== 2) continue;
+      const attr = protoFields(f.bytes);
+      const str = (no) => attr.find((a) => a.no === no && a.wire === 2)?.bytes.toString("utf8");
+      if (str(2) === "package" && !str(1)) return str(3) || null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 /** Depth-first hunt for an XmlAttribute named [name] (field 2) whose raw value (field 3) is a string. */
 function findStringAttribute(buf, name) {
   let fields;

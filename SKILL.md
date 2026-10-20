@@ -312,6 +312,7 @@ which also makes it macOS-only. `.ipa` comes from `ios.ipa` / `VYDANNE_IPA` (a d
 newest), the build number from the archive's own `CFBundleVersion`, and `ios.testFlightGroup` may add
 it to an **internal** group. External groups are REFUSED — they need Beta App Review, a submission by
 another name — and App Store review is never submitted, mirroring the Play side refusing `production`.
+Before any network call `prerelease` checks the build's own id against the config: the `.aab` manifest's package must equal `google.packageName`, and the `.ipa`'s `CFBundleIdentifier` must equal `bundleId`. A build with another id (a debug, staging or other variant of the app) or one whose id cannot be read is REFUSED, and no flag or env var skips it.
 It then points the version being prepared AT that build, so the fix-and-re-upload loop is one command:
 re-running re-points (the relationship holds one build), while a version that is `IN_REVIEW` or
 `READY_FOR_SALE` is left alone, since re-pointing it would mean withdrawing a submission.

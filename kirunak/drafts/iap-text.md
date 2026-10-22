@@ -12,7 +12,7 @@ owner, 2026-10-21, session 36492b62-ee48-4425-b343-d657e9fc4133, picking "C: Tea
 ## Why
 vydanne pushes every other part of a listing but no in-app purchase text, so each app's purchase names and
 descriptions in every language would be typed by hand in two consoles. It is a vydanne change for every app in the
-portfolio, not part of KatyaFM's task; katyafm/settings waits for it.
+portfolio, not part of KatyaFM's task; katyafm/settings no longer waits for it (amendment A-4, 2026-10-22).
 
 ## What was found
 - vydanne 1.3.0 on master (0ac06d8, 2026-10-20) [commit 0ac06d8] [file package.json]
@@ -20,7 +20,7 @@ portfolio, not part of KatyaFM's task; katyafm/settings waits for it.
 - Nothing in vydanne calls App Store Connect's in-app purchase localizations or Google Play's one-time product listings [command grep -rlnE 'inAppPurchase|inappproducts|onetimeproducts' src bin]
 - KatyaFM's config says a person creates the in-app purchase and types its fields into App Store Connect and the Play Console; the price is the owner's [file ~/sources/katyafm/vydanne.config.mjs:115-118]
 - KatyaFM's full version, `app.kupalinka.katyafm.full`, has its name and description in 20 languages: `fastlane/iap/app.kupalinka.katyafm.full/<lang>/display_name.txt` and `description.txt` for ar be bn de en es fr he hi id it ja ko pl pt ru tr uk ur zh [command ls ~/sources/katyafm/fastlane/iap/app.kupalinka.katyafm.full]
-- katyafm/settings AC-18 needs that name and description in both stores in the same 20 languages; its step S-37 pushes them with vydanne and diffs them, and stays open until vydanne can [file ~/sources/katyafm/kirunak/tasks/settings/task.md:30] [file ~/sources/katyafm/kirunak/tasks/settings/plan.md:249-254]
+- katyafm/settings took the full version's store text out by amendment A-4 (owner, 2026-10-22: "I don't want to wait for vydanne release for this story, I want it closed"): its O-6 says the 20 languages' texts in fastlane/iap/app.kupalinka.katyafm.full/ reach the stores with this task [file ~/sources/katyafm/kirunak/tasks/settings/task.md:80] [file ~/sources/katyafm/kirunak/tasks/settings/amendments/A-4.md]
 - vydanne has no kirunak folder yet, but kirunak's workspace knows the repo: `k draft new vydanne/iap-text` wrote this file [command k draft new vydanne/iap-text --dry-run]
 - A KatyaFM session prepared an intake prompt on 2026-10-21 (uncommitted, in KatyaFM's tmp/) with a starting point (both stores, every language with a folder, dry by default with `--apply`, `diff` local against live, nothing submitted for review, every app) and ten questions; they are taken into the questions below [file ~/sources/katyafm/tmp/vydanne-intake-prompt.md]
 - That prompt asks for research before the questions, with links: App Store Connect API in-app purchase localizations (In-App Purchases v2, inAppPurchaseLocalizations), and Google Play's API for one-time product listings (inappproducts and the newer monetization.onetimeproducts: which one to use and what each accepts). Not yet done [file ~/sources/katyafm/tmp/vydanne-intake-prompt.md:42-44]
@@ -41,4 +41,4 @@ portfolio, not part of KatyaFM's task; katyafm/settings waits for it.
 13. KatyaFM runs `npx --yes vydanne` with no node_modules; pin the vydanne version in its package.json instead: yes or no?
 14. Tests run against recorded API answers, never against the live stores: yes or no?
 15. The task lives in vydanne (vydanne/iap-text, as this draft does), not in gulnya: yes or no?
-16. When it lands, katyafm/settings S-37 pushes the full version's text with it and checks it with `diff`: yes or no?
+16. When it lands, this task pushes KatyaFM's full version text in the 20 languages with it and checks it with `diff` (katyafm/settings O-6): yes or no?

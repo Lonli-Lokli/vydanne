@@ -3,6 +3,8 @@ import path from "node:path";
 import { green, yellow, red } from "../../util.mjs";
 import { reportCrossStore } from "../../crossStore.mjs";
 import { playImages, imageLocales } from "../images.mjs";
+import { checkLargeScreenSet, manualImages, PLAY_API_IMAGE_TYPES } from "../manual.mjs";
+import { refusedShots } from "../../shotGate.mjs";
 
 const FIELDS = [["title", "title"], ["shortDescription", "short_description"], ["fullDescription", "full_description"]];
 
@@ -30,6 +32,41 @@ export async function run(config, client) {
     return false;
   }
 
+  // Every image set this fill would send, planned before an edit is opened, so a refusal touches nothing.
+  const sets = [];
+  for (const lang of imageLocales(g, localLangs)) {
+    for (const [type, src, kind] of IMAGES) {
+      // A per-locale override directory (`<src>/<lang>`) wins when it exists, so an app can localize
+      // some slots and leave the rest shared without listing every combination in the config.
+      const localized = path.join(src, lang);
+      const from = kind === "dir" && fs.existsSync(localized) ? localized : src;
+      if (!fs.existsSync(from)) continue;
+      const files = kind === "dir" ? fs.readdirSync(from).filter((f) => /\.(png|jpe?g)$/i.test(f)).sort().map((f) => path.join(from, f)) : [from];
+      sets.push({ lang, type, kind, files });
+    }
+  }
+
+  // The approval gate (src/shotGate.mjs): a screenshot beyond its threshold that the owner has not approved stops
+  // the whole fill. Screenshots only; the icon and the feature graphic are not compared shots.
+  const shots = sets.filter((s) => s.kind === "dir").flatMap((s) => s.files);
+  // Sets the API cannot take (the Chromebook set): checked like the rest, and named for Play Console.
+  const manual = manualImages(config).filter(([, dir]) => fs.existsSync(dir))
+    .map(([type, dir]) => ({ type, dir: path.resolve(dir), ...checkLargeScreenSet(dir) }));
+  const refused = refusedShots(config, [...shots, ...manual.flatMap((m) => m.files)]) || [];
+  if (refused.length) {
+    for (const r of refused) console.error(red(`  refused ${r.file}: ${r.why}`));
+    console.error(red(`fill(play): refusing to upload: ${refused.length} shot(s) are not cleared by their comparison or the owner.`));
+    return false;
+  }
+  for (const m of manual) {
+    if (m.problems.length) {
+      for (const p of m.problems) console.error(red(`  ${m.type}: ${p}`));
+      console.error(red(`fill(play): refusing to upload: the ${m.type} set in ${m.dir} does not meet Play's rule.`));
+      return false;
+    }
+    console.log(yellow(`  ${m.type}: Play's API cannot take this set (its image types are ${PLAY_API_IMAGE_TYPES.join(", ")}), so it is not pushed. ${m.files.length} image(s) checked; upload the folder ${m.dir} by hand in Play Console, in the listing's Chromebook screenshots.`));
+  }
+
   const editId = await client.newEdit();
   try {
     // Listing text
@@ -44,23 +81,15 @@ export async function run(config, client) {
       }
     }
     // Images — replace a type only when the local asset exists (delete-all then upload).
-    for (const lang of imageLocales(g, localLangs)) {
-      for (const [type, src, kind] of IMAGES) {
-        // A per-locale override directory (`<src>/<lang>`) wins when it exists, so an app can localize
-        // some slots and leave the rest shared without listing every combination in the config.
-        const localized = path.join(src, lang);
-        const from = kind === "dir" && fs.existsSync(localized) ? localized : src;
-        if (!fs.existsSync(from)) continue;
-        const files = kind === "dir" ? fs.readdirSync(from).filter((f) => /\.(png|jpe?g)$/i.test(f)).sort().map((f) => path.join(from, f)) : [from];
-        // A dir that EXISTS but is empty is different from a missing one: someone (the store-assets
-        // bridge, when zdymak stops producing a form factor) deliberately emptied it, expecting the live
-        // set to follow. It doesn't — never-delete-by-omission holds — but that must be said, because the
-        // silent skip is how a listing keeps showing screenshots of a UI the app no longer has.
-        if (!files.length) { console.log(yellow(`  ${lang}/${type}: local dir is empty — live set left untouched (delete it in Play Console if it is stale)`)); continue; }
-        await client.deleteAllImages(editId, lang, type);
-        for (const f of files) await client.uploadImage(editId, lang, type, f);
-        console.log(green(`  ${lang}/${type}: ${files.length} image(s)`));
-      }
+    for (const { lang, type, files } of sets) {
+      // A dir that EXISTS but is empty is different from a missing one: someone (the store-assets
+      // bridge, when zdymak stops producing a form factor) deliberately emptied it, expecting the live
+      // set to follow. It doesn't — never-delete-by-omission holds — but that must be said, because the
+      // silent skip is how a listing keeps showing screenshots of a UI the app no longer has.
+      if (!files.length) { console.log(yellow(`  ${lang}/${type}: local dir is empty — live set left untouched (delete it in Play Console if it is stale)`)); continue; }
+      await client.deleteAllImages(editId, lang, type);
+      for (const f of files) await client.uploadImage(editId, lang, type, f);
+      console.log(green(`  ${lang}/${type}: ${files.length} image(s)`));
     }
 
     const v = await client.validate(editId);

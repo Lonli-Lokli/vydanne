@@ -189,6 +189,12 @@ export interface GoogleConfig {
    * subdirectory, when present, overrides the shared source for that language.
    */
   imageLocales?: string[] | "*";
+  /**
+   * Sets Play's API cannot take, by type -> local folder; default
+   * `{ chromebookScreenshots: "marketing/out/play-chromebook-plain" }`. `fill` checks each against Play's
+   * large-screen rule, refuses on a fault, and names the folder for a manual upload in Play Console.
+   */
+  manualImages?: { chromebookScreenshots?: string };
 }
 
 /** Play listing image slots. */
@@ -336,6 +342,12 @@ export interface ExportConfig {
 
 /** The `vydanne.config.mjs` default export. */
 export interface VydanneConfig {
+  /**
+   * The approval gate: `approvals` is the `approvals.json` zdymak's `compare` writes beside its references. When set,
+   * `fill --store google` refuses every screenshot whose content its comparison did not pass and the owner did not
+   * approve, before an edit is opened.
+   */
+  compare?: { approvals: string };
   bundleId: string;
   /** Fallback for every locale without its own listing — must be populated. */
   primaryLocale: string;

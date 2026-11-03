@@ -166,7 +166,22 @@ Every field is optional except `bundleId` and `primaryLocale`. The ones you reac
 | `bridge` | `{ out, apple, play, creative }` — which zdymak output folder feeds which store slot, when `dir:` overrides make them differ. `apple.iphoneduo: { dirs, order }` picks the Duo targets and their order; `creative.header` / `creative.search` name the file to carry when zdymak renders two for one slot. |
 | `creative` | `{ dir, searchFromHeader, poster }` — the iOS 27 product page header and search results asset. See [iOS 27](#ios-27-iphone-duo-and-the-product-page-header). |
 | `push` | `{ skip: [...] }` — pipeline steps this app never runs. |
-| `google` | The Play block, including `track`, `images` and `imageLocales`. |
+| `google` | The Play block, including `track`, `images`, `imageLocales` and `manualImages`. |
+| `compare` | `{ approvals }` — the `approvals.json` zdymak's `compare` writes. When set, `fill` refuses any screenshot beyond its threshold that the owner has not approved. See [Large screens on Play](#large-screens-on-play). |
+
+### Large screens on Play
+
+Play's 7-inch and 10-inch tablet sets are two slots, `sevenInchScreenshots` and `tenInchScreenshots`, each filled
+from its own folder (`bridge` reads zdymak's `play-tablet-7` and `play-tablet` output). Play Console's third
+large-screen set, Chromebook, has no type in the Publishing API (`edits.images` takes phone, 7-inch, 10-inch, TV and
+Wear screenshots, the icon, the feature graphic and the TV banner; read 2026-11-03). So `fill` checks the Chromebook
+folder (`google.manualImages.chromebookScreenshots`, default `marketing/out/play-chromebook-plain`) against Play's
+rule, at least four images of 16:9 or 9:16 with each side 1,080 to 7,680 px and no alpha, says it did not push it, and
+names the folder to upload by hand. A fault in it refuses the fill.
+
+With `compare: { approvals }` set, a screenshot is sent only when zdymak's comparison passed it or the owner approved
+it (its content's sha256 is in `references`, `accepted` or `passed`). One shot that is neither refuses the whole fill
+before an edit is opened, and the missing approvals file refuses every shot.
 
 **3. Write your listing** as plain text files, one folder per language:
 

@@ -7,6 +7,7 @@ import { IOS_DEVICE, MAC_DEVICE, screenshotBase, IMAGE_FILE } from "../screensho
 import { SNAPSHOT_CATALOG, CREATIVE_SLOTS, mismatch, describeSize, matchFile } from "../assetCatalog.mjs";
 import { creativeBase } from "../creative.mjs";
 import { playImages } from "../play/images.mjs";
+import { manualImages } from "../play/manual.mjs";
 
 /**
  * Map zdymak's build output onto the folders `fill` uploads from.
@@ -33,8 +34,8 @@ import { playImages } from "../play/images.mjs";
  * SOURCE DIRECTORIES ARE NOT TARGET NAMES. zdymak writes each shot to `<dir || target>`, and `dir:` is
  * how one target serves two purposes — a styled `play-phone/` for the website and a plain
  * `play-phone-plain/` for the Play upload, which Google requires to be the bare interface. It is also
- * the only way to produce Play's 7" slot at all: there is no `play-tablet7` target, so that set can
- * only exist as `{ target: 'play-tablet', dir: 'play-tablet7-plain' }`. Mapping by TARGET therefore got
+ * how older zdymak configs made Play's 7" slot, before zdymak had a `play-tablet-7` target:
+ * `{ target: 'play-tablet', dir: 'play-tablet7-plain' }`. Both folder names are read. Mapping by TARGET therefore got
  * two things wrong at once on any config using `dir:` — it bridged the styled variant into the plain
  * slot, and it treated the real 7" directory as a locale while wiping the destination it belonged in.
  * So the tables below are keyed by DIRECTORY, with the `-plain` convention preferred and the bare
@@ -126,12 +127,13 @@ for (const t of Object.keys(MAC_SLOT)) {
 // its read path.
 const PLAY_SOURCES = {
   phoneScreenshots: ["play-phone-plain", "play-phone"],
-  sevenInchScreenshots: ["play-tablet7-plain", "play-tablet7"],
+  sevenInchScreenshots: ["play-tablet-7-plain", "play-tablet-7", "play-tablet7-plain", "play-tablet7"],
   tenInchScreenshots: ["play-tablet-plain", "play-tablet"],
   wearScreenshots: ["play-wear-plain", "play-wear"],
   tvScreenshots: ["play-tv-plain", "play-tv"],
   featureGraphic: ["play-feature-graphic.png"],
   tvBanner: ["play-tv-banner.png"],
+  chromebookScreenshots: ["play-chromebook-plain", "play-chromebook"],
 };
 
 /**
@@ -386,7 +388,8 @@ export async function run(config) {
   // Only the untranslated root is carried: Play graphics default to one set at `defaultLocale`, and an
   // app that opts into per-language art (`google.imageLocales`) points `fill` at the subdirectories it
   // maintains itself.
-  const playDest = Object.fromEntries(playImages(config).map(([type, src, kind]) => [type, { src, kind }]));
+  const playDest = Object.fromEntries([...playImages(config), ...manualImages(config).map(([type, src]) => [type, src, "dir"])]
+    .map(([type, src, kind]) => [type, { src, kind }]));
   const playDirs = new Set();
   const playCarried = new Set();
   for (const [type, candidates] of Object.entries(playSources)) {

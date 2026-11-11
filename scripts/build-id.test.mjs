@@ -68,11 +68,33 @@ function ipa(dir, id) {
   return file;
 }
 
+/**
+ * An archive like Asilak 1.5 (2014): a Watch app's Info.plist nested deeper, with its own id, stored BEFORE the
+ * app's own, as Xcode's export wrote it.
+ */
+function ipaWithWatch(dir, id) {
+  const app = path.join('Payload', 'App.app');
+  const watch = path.join(app, 'Watch', 'Watch App.app');
+  fs.mkdirSync(path.join(dir, watch), { recursive: true });
+  const plist = (bundleId) => `<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>CFBundleIdentifier</key>` +
+    `<string>${bundleId}</string><key>CFBundleVersion</key><string>7</string></dict></plist>`;
+  fs.writeFileSync(path.join(dir, watch, 'Info.plist'), plist(`${id}.watch`));
+  fs.writeFileSync(path.join(dir, app, 'Info.plist'), plist(id));
+  const file = path.join(dir, `${id}.ipa`);
+  execFileSync('zip', ['-q', file, path.join(watch, 'Info.plist'), path.join(app, 'Info.plist')], { cwd: dir });
+  return file;
+}
+
 const mac = { skip: process.platform !== 'darwin' && 'the iOS upload is macOS-only' };
 
 test('iOS: the archive says its own CFBundleIdentifier', mac, async () => {
   const dir = tmp('ipa');
   assert.equal(await ipaBundleId(ipa(dir, 'com.example.app')), 'com.example.app');
+});
+
+test('iOS: an archive holding a Watch app says the app\'s own id, not the Watch app\'s', mac, async () => {
+  const dir = tmp('ipa-watch');
+  assert.equal(await ipaBundleId(ipaWithWatch(dir, 'com.example.app')), 'com.example.app');
 });
 
 test('iOS: a differing-id archive is refused before any network call, whatever the environment says', mac, async () => {

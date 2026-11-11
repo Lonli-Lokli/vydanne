@@ -111,9 +111,14 @@ export async function ipaBundleId(ipa) {
 
 async function ipaPlistKey(ipa, key) {
   try {
+    // The app's own Info.plist only: unzip's `*` also crosses `/`, so `Payload/*.app/Info.plist` matched a Watch
+    // app's or a bundle's plist too, and the first one stored won (Asilak 1.5 (2014) read as its Watch app).
+    const { stdout: names } = await run_("unzip", ["-Z1", ipa], { maxBuffer: 32 * 1024 * 1024 });
+    const plist = names.split("\n").find((name) => /^Payload\/[^/]+\.app\/Info\.plist$/.test(name));
+    if (!plist) return null;
     const { stdout } = await run_(
       "/bin/sh",
-      ["-c", `unzip -p ${JSON.stringify(ipa)} 'Payload/*.app/Info.plist' | plutil -convert json -o - -`],
+      ["-c", `unzip -p ${JSON.stringify(ipa)} ${JSON.stringify(plist)} | plutil -convert json -o - -`],
       { maxBuffer: 32 * 1024 * 1024 },
     );
     return JSON.parse(stdout)[key] ?? null;

@@ -52,7 +52,7 @@
     "check:docs": "node scripts/check-docs.mjs",
     "check:types": "tsc --noEmit -p tsconfig.json && node scripts/check-types.mjs",
     "check:config": "node scripts/check-config.mjs",
-    "verify": "npm run check:docs && npm run check:types && npm run check:config && npm run check:middleware && npm run check:release && npm run check:tracks && npm run check:notes && npm run check:duo && npm run check:creative && npm run check:screenshots && npm run check:bridge && npm run check:previews && npm run check:build-id && npm run check:held-build",
+    "verify": "npm run check:docs && npm run check:types && npm run check:config && npm run check:middleware && npm run check:release && npm run check:tracks && npm run check:notes && npm run check:duo && npm run check:creative && npm run check:screenshots && npm run check:bridge && npm run check:previews && npm run check:build-id && npm run check:held-build && npm run check:build-commit",
     "prepublishOnly": "npm run verify",
     "release:patch": "node scripts/release.mjs patch",
     "release:minor": "node scripts/release.mjs minor",
@@ -67,7 +67,8 @@
     "check:bridge": "node --test scripts/bridge.test.mjs",
     "check:previews": "node --test scripts/previews.test.mjs",
     "check:build-id": "node --test scripts/build-id.test.mjs",
-    "check:held-build": "node --test scripts/held-build.test.mjs"
+    "check:held-build": "node --test scripts/held-build.test.mjs",
+    "check:build-commit": "node --test scripts/build-commit.test.mjs"
   },
   "dependencies": {
     "dotenv": "^17.4.2",

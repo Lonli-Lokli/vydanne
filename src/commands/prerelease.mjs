@@ -30,8 +30,9 @@ const run_ = promisify(execFile);
  *    ones who install without buying it.
  *
  * Apple assigns nothing: the build number comes from the archive's own CFBundleVersion, so build
- * numbering stays with the build, and re-uploading one Apple already holds fails loudly instead of
- * silently replacing a binary.
+ * numbering stays with the build, and an archive carrying a number Apple already holds is refused
+ * loudly, before any transfer, instead of the held build being attached in its place.
+ * VYDANNE_ATTACH_HELD=1 says the archive IS the held binary (a re-run after `withdraw`).
  *
  * WHAT IT ALSO DOES: points the version you are preparing AT the build it just uploaded. That is
  * the loop this command exists to serve — ship a build to testers, find something, fix it, upload
@@ -177,17 +178,26 @@ export async function run(config, client, credentials) {
   // Refusing costs a re-archive. Accepting costs a permanently untraceable release.
   const declared = await ipaBuildNumber(ipa);
   const { highest, held } = await appBuilds(client);
-  // Already on the app? Then this is not a new upload, it is the second half of one — the archive
-  // went up earlier and the version it was meant for was locked in review at the time. That is the
-  // exact shape `withdraw` creates, and re-uploading is both impossible (Apple refuses a repeated
-  // build number) and unnecessary. Skip to attaching it.
+  // Already on the app? That is one of two things, and App Store Connect cannot say which: it keeps
+  // no hash of a build's binary. Either this archive went up earlier and the version it was meant for
+  // was locked in review at the time (the exact shape `withdraw` creates: re-uploading is impossible
+  // and unnecessary, so attach the held build), or this is a DIFFERENT binary carrying a used number,
+  // and attaching the held build would ship the old binary while the new one never reaches the store.
+  // So a held number is refused, and VYDANNE_ATTACH_HELD=1 is the operator saying "same binary".
   const alreadyUp = declared != null && held.has(String(declared));
   if (declared == null) {
     console.log(yellow("  build ?  — could not read CFBundleVersion from the archive; not gated"));
   } else {
     console.log(`  build ${declared} (CFBundleVersion, read from the archive)`);
-    if (alreadyUp) {
-      console.log(green("  already uploaded — skipping the transfer, attaching it below"));
+    if (alreadyUp && process.env.VYDANNE_ATTACH_HELD !== "1") {
+      console.error(red(`  refusing: build ${declared} is already on App Store Connect.`));
+      console.error("  If this archive is a different binary, bump CFBundleVersion and re-archive: attaching the");
+      console.error("  held build would ship the old binary, and this one would never reach the store.");
+      console.error("  If it IS the binary already uploaded (a re-run after `withdraw`), re-run with");
+      console.error("  VYDANNE_ATTACH_HELD=1 to attach the held build.");
+      return false;
+    } else if (alreadyUp) {
+      console.log(green("  already uploaded (VYDANNE_ATTACH_HELD=1) — skipping the transfer, attaching it below"));
     } else if (highest != null && Number(declared) <= highest) {
       // Not above the highest, and not one Apple holds: the number went BACKWARDS. That is a
       // build-number fallback firing, not a re-run, and the two are worth telling apart — the

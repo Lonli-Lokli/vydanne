@@ -84,6 +84,9 @@ export class PlayClient {
     return j;
   }
 
+  /** The bundles Play holds for this app, each with its versionCode and sha256. */
+  listBundles(editId) { return this.req("GET", `/edits/${editId}/bundles`); }
+
   getTrack(editId, track) { return this.req("GET", `/edits/${editId}/tracks/${track}`); }
 
   /**

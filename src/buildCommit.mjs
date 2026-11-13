@@ -32,9 +32,13 @@ import { execFileSync } from "node:child_process";
  * (`rev-list --count` on the candidate must equal the build number) and an unverifiable one comes
  * back as a stated reason rather than a guess.
  *
- * The check is not ceremony even where the convention does hold. `rev-list --reverse` is ORDERED,
- * not counted: on a history with merges the Nth line is not necessarily the commit with N
- * ancestors, so indexing alone is right only by luck on a linear repo.
+ * `rev-list --reverse` is ORDERED, not counted: on a history with merges the Nth line is not
+ * necessarily the commit with N ancestors, so the Nth line is never the answer by itself. The
+ * commit is SEARCHED for instead, along HEAD's first-parent line (the mainline a release is cut
+ * from), where the count grows with every step, so a binary search needs a dozen `rev-list` calls;
+ * a count no mainline commit carries (a build cut on a side branch since merged) falls back to the
+ * other commits, nearest the Nth line first. Vodar's build 797 was refused for a year's worth of
+ * merges before this (its Nth line had 777 ancestors).
  *
  * It has already caught a real one — a build numbered `1` sitting in App Store Connect above a 131,
  * which is a `getOrDefault(1)` fallback firing when the git count failed at archive time. That
@@ -89,17 +93,40 @@ export function commitForBuild(order, build, offset = 0) {
   if (n > order.length) {
     return { why: `${shown} is past HEAD (${order.length} commits) — built elsewhere, or on an unmerged branch` };
   }
-  const sha = order[n - 1];
-  let count;
+  let sha;
   try {
-    count = Number(git(["rev-list", "--count", sha]));
+    sha = commitWithCount(order, n);
   } catch {
     return { why: "git rev-list failed" };
   }
-  if (count !== n) {
-    return { why: `commit ${sha.slice(0, 9)} has ${count} ancestors, not ${n} — build number is not a commit count here` };
+  if (!sha) {
+    return { why: `no commit has ${n} ancestors — build number is not a commit count here` };
   }
   return { sha };
+}
+
+const countOf = (sha) => Number(git(["rev-list", "--count", sha]));
+
+/** The commit with exactly [n] ancestors: HEAD's mainline first (binary search), then any other, nearest index n-1. */
+function commitWithCount(order, n) {
+  const line = git(["rev-list", "--first-parent", "--reverse", "HEAD"]).split("\n").filter(Boolean);
+  let lo = 0;
+  let hi = line.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const c = countOf(line[mid]);
+    if (c === n) return line[mid];
+    if (c < n) lo = mid + 1;
+    else hi = mid - 1;
+  }
+  const mainline = new Set(line);
+  for (let d = 0; d < order.length; d++) {
+    for (const i of d ? [n - 1 - d, n - 1 + d] : [n - 1]) {
+      const sha = order[i];
+      if (sha && !mainline.has(sha) && countOf(sha) === n) return sha;
+    }
+  }
+  return null;
 }
 
 /**

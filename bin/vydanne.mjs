@@ -75,7 +75,7 @@ try {
   } else if (cmd === "locales") {
     const r = (await loadConfig(cfgPath)).resolvedLocales;
     console.log(`supported (${Object.keys(r.supported).length}):`);
-    for (const [ui, asc] of Object.entries(r.supported)) console.log(`  ${ui} -> ${asc}`);
+    for (const [ui, asc] of Object.entries(r.targets ?? r.supported)) console.log(`  ${ui} -> ${[asc].flat().join(", ")}`);
     console.log(`unsupported (${r.unsupported.length}) [no App Store language -> fall back to primary]: ${r.unsupported.join(", ")}`);
     // A localeMap entry pointing at a code Apple does not have is a config mistake, not a missing
     // language — it would otherwise be indistinguishable from the line above.

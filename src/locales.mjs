@@ -19,30 +19,38 @@ export const UI_TO_ASC = {
 };
 
 /**
- * `code` as an App Store locale, or null when Apple has no listing language for it.
+ * `code` as every App Store locale it fills, in order: none when Apple has no listing language for it.
  *
  * `extra` is the app's own `localeMap` — the extension point this table lacked. Apple's list moves, and
  * projects spell locales in whatever their UI framework uses; neither is a reason to need a vydanne
  * release. An app can map its code onto a VALID one, and only onto a VALID one: an override pointing at
- * a language Apple does not have would fail at upload instead of here.
+ * a language Apple does not have would fail at upload instead of here. An entry may name several
+ * (`es: ["es-ES", "es-MX"]`): an app with one Spanish UI and two Spanish listings would otherwise leave
+ * the second listing with no screenshots, or with ones copied by hand that nothing rebuilds.
  */
-export const toAsc = (code, extra) => {
-  if (VALID.has(code)) return code;
-  const mapped = extra?.[code] ?? UI_TO_ASC[code] ?? null;
-  return mapped && VALID.has(mapped) ? mapped : null;
+export const toAscAll = (code, extra) => {
+  if (VALID.has(code)) return [code];
+  const mapped = [extra?.[code] ?? UI_TO_ASC[code] ?? []].flat();
+  return [...new Set(mapped.filter((c) => VALID.has(c)))];
 };
+
+/** `code` as one App Store locale (the first `toAscAll` gives), or null when Apple has no listing language for it. */
+export const toAsc = (code, extra) => toAscAll(code, extra)[0] ?? null;
 
 export function resolveLocales(uiCodes = [], extra) {
   const supported = {};
+  const targets = {};
   const unsupported = [];
   const invalid = [];
   for (const c of uiCodes) {
-    const asc = toAsc(c, extra);
-    if (asc) supported[c] = asc;
+    const all = toAscAll(c, extra);
+    if (all.length) { supported[c] = all[0]; targets[c] = all; }
     // An override that names a code Apple doesn't have is a config mistake, not a missing language —
-    // kept apart so the report can say which it is instead of blaming the locale.
-    else if (extra?.[c]) invalid.push(`${c} -> ${extra[c]}`);
-    else unsupported.push(c);
+    // kept apart so the report can say which it is instead of blaming the locale. One bad folder in a
+    // list is reported too, though the good ones still resolve.
+    const bad = VALID.has(c) ? [] : [extra?.[c] ?? []].flat().filter((t) => !VALID.has(t));
+    for (const t of bad) invalid.push(`${c} -> ${t}`);
+    if (!all.length && !bad.length) unsupported.push(c);
   }
-  return { supported, unsupported, invalid };
+  return { supported, targets, unsupported, invalid };
 }

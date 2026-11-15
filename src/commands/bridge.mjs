@@ -326,8 +326,8 @@ export async function run(config) {
     return false;
   });
 
-  // A source folder that is itself an App Store code (`es-MX`) owns that folder: a localeMap entry that
-  // also names it (`es: ["es-ES", "es-MX"]`) fills it only while zdymak renders no set of its own.
+  // A source folder that is itself an App Store code (`es-MX`) owns that folder: a localeMap entry naming
+  // several folders (`es: ["es-ES", "es-MX"]`) fills one of them only while zdymak renders no set of its own.
   const direct = new Set(localeDirs.filter((d) => VALID.has(d)));
   for (const source of [null, ...localeDirs]) {
     const from = source ? path.join(SRC, source) : SRC;
@@ -337,7 +337,10 @@ export async function run(config) {
     // A code with no App Store language (Belarusian) is skipped — a locale with no folder falls back
     // to the primary listing, which is the intent.
     if (!all.length) { noLanguage.push(source); continue; }
-    for (const asc of all.filter((a) => a === source || !direct.has(a))) {
+    // The precedence above settles only an entry naming several folders. The root set and a one-folder
+    // mapping (the built-in `es` → es-ES beside a rendered `es-ES/`) are carried as they always were.
+    const several = source && all.length > 1;
+    for (const asc of all.filter((a) => !several || !direct.has(a))) {
 
       // Only ship screenshots for a locale that also has LISTING TEXT. Uploading them alone makes fill
       // create the App Store localization to attach them to, and a created localization stops falling

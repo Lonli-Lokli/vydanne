@@ -237,3 +237,23 @@ test('resolveLocales keeps the first folder as supported, lists every one under 
   assert.deepEqual(bad.invalid, ['es -> es-XX']);
   assert.deepEqual(bad.targets, { es: ['es-ES'] });
 });
+
+test('the root set still reaches the primary listing beside a folder named after the primary code', async () => {
+  const p = project();
+  await png(p.out('appstore-iphone-6.9', '01-home.png'), 1320, 2868);
+  await png(p.out('en-GB', 'appstore-iphone-6.9', '02-x.png'), 1320, 2868);
+  const { result, out } = await bridgeIn(p.dir, p.config);
+  assert.equal(result, true, out);
+  assert.deepEqual(listing(p.dir, 'fastlane', 'screenshots', 'en-GB'), ['iphone69_01-home.png', 'iphone69_02-x.png'], out);
+});
+
+test('a built-in mapping (es → es-ES) beside a rendered es-ES folder keeps both sets, as before', async () => {
+  const p = project();
+  fs.mkdirSync(path.join(p.config.metadataDir, 'es-ES'), { recursive: true });
+  await png(p.out('appstore-iphone-6.9', '01-home.png'), 1320, 2868);
+  await png(p.out('es', 'appstore-iphone-6.9', '01-es.png'), 1320, 2868);
+  await png(p.out('es-ES', 'appstore-iphone-6.9', '02-eses.png'), 1320, 2868);
+  const { result, out } = await bridgeIn(p.dir, p.config);
+  assert.equal(result, true, out);
+  assert.deepEqual(listing(p.dir, 'fastlane', 'screenshots', 'es-ES'), ['iphone69_01-es.png', 'iphone69_02-eses.png'], out);
+});

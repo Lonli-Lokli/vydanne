@@ -14,7 +14,8 @@ export default {
   uiLocales: ["en", "de", "es", "fr", "ja", "zh-Hans"],
   // Only for codes the built-in table doesn't cover — e.g. if your resource folders use Android's
   // spellings. Merged over the defaults, and an entry naming a code Apple doesn't have is reported.
-  // localeMap: { nb: "no", iw: "he" },
+  // An entry may name several listings one UI language fills (one Spanish UI, es-ES and es-MX listings).
+  // localeMap: { nb: "no", iw: "he", es: ["es-ES", "es-MX"] },
   metadataDir: "fastlane/metadata",
   // Defaults to fastlane's supply convention; set it if your repo puts them somewhere else.
   // screenshots: { IOS: "fastlane/screenshots", MAC_OS: "fastlane/screenshots-macos" },

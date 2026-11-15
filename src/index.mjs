@@ -15,7 +15,7 @@ export { PlayClient } from "./play/client.mjs";
 export { loadConfig, CONFIG_KEYS } from "./config.mjs";
 export { MiddlewareRefusal, normalizeMiddleware, runMiddleware } from "./middleware.mjs";
 export { COMMANDS, PLAY_COMMANDS, COMMAND_NAMES } from "./registry.mjs";
-export { resolveLocales, toAsc, VALID, UI_TO_ASC } from "./locales.mjs";
+export { resolveLocales, toAsc, toAscAll, VALID, UI_TO_ASC } from "./locales.mjs";
 export { makeToken, resolveKey } from "./jwt.mjs";
 export { DEFAULT_SCREENSHOT_BASE, IOS_DEVICE, MAC_DEVICE, screenshotBase } from "./screenshots.mjs";
 export { DEFAULT_PLAY_IMAGES, PLAY_IMAGE_KIND, playImages } from "./play/images.mjs";

@@ -159,7 +159,7 @@ Every field is optional except `bundleId` and `primaryLocale`. The ones you reac
 | Field | What it's for |
 |---|---|
 | `screenshots` | Where your screenshots live, per platform. Defaults to `fastlane/screenshots` + `fastlane/screenshots-macos`. |
-| `localeMap` | Your language codes → Apple's, for anything the built-in table misses (`{ nb: "no" }`). |
+| `localeMap` | Your language codes → Apple's, for anything the built-in table misses (`{ nb: "no" }`). An entry may name several listings one language fills (`{ es: ["es-ES", "es-MX"] }`): `bridge` copies that language's screenshots into each. |
 | `ageRating` | The content descriptors behind any rating above `4+`. Apple computes the band from them. |
 | `reviewContact` | `{ demoAccountRequired }` — otherwise inferred from whether `review_information/demo_user.txt` exists. |
 | `export` | Export-compliance details. `algorithms` + `statement` are required for `encryption: "standard"`. |

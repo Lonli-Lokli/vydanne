@@ -352,9 +352,12 @@ export interface VydanneConfig {
   /**
    * App locale code -> App Store locale code, for codes Apple spells differently or does not know.
    * Merged over the built-in table, so declare only your exceptions. An override naming a code Apple
-   * does not have is reported by `locales` and `preflight` rather than silently ignored.
+   * does not have is reported by `locales` and `preflight` rather than silently ignored. An entry may
+   * name several codes (`{ es: ["es-ES", "es-MX"] }`): `bridge` then writes that source folder's
+   * screenshots into each, and `preflight` checks each listing. A source folder zdymak renders under an
+   * App Store code of its own (`es-MX/`) keeps that folder.
    */
-  localeMap?: Record<string, string>;
+  localeMap?: Record<string, string | string[]>;
   metadataDir?: string;
   /**
    * Where each platform's screenshots live. Defaults to fastlane's supply convention
@@ -553,8 +556,10 @@ export declare function makeToken(opts: {
 
 /** The .p8 text itself, from `keyContent` / `keyPath` / the default location. Throws if it is neither. */
 export declare function resolveKey(opts: { keyId?: string; keyPath?: string; keyContent?: string }): string;
-export declare function resolveLocales(uiCodes: string[], extra?: Record<string, string>): ResolvedLocales;
-export declare function toAsc(code: string, extra?: Record<string, string>): string | null;
+export declare function resolveLocales(uiCodes: string[], extra?: Record<string, string | string[]>): ResolvedLocales;
+export declare function toAsc(code: string, extra?: Record<string, string | string[]>): string | null;
+/** Every App Store code `code` fills, in order; empty when Apple has no listing language for it. */
+export declare function toAscAll(code: string, extra?: Record<string, string | string[]>): string[];
 export declare const VALID: Set<string>;
 export declare const UI_TO_ASC: Record<string, string>;
 export declare const CONFIG_KEYS: readonly string[];
@@ -582,7 +587,10 @@ export declare const COMMANDS: Record<string, { mod: string; client?: boolean; c
 export declare const PLAY_COMMANDS: Record<string, { mod: string; writes?: boolean }>;
 
 export interface ResolvedLocales {
+  /** Each UI code's App Store code (the first, when its `localeMap` entry names several). */
   supported: Record<string, string>;
+  /** Each UI code's App Store codes, every one its `localeMap` entry names. */
+  targets: Record<string, string[]>;
   /** Codes with no App Store language — they fall back to the primary listing. */
   unsupported: string[];
   /** `localeMap` entries pointing at a code Apple does not have. A config mistake, not a missing language. */

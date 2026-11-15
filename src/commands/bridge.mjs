@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { green, yellow, red } from "../util.mjs";
-import { toAsc } from "../locales.mjs";
+import { toAscAll, VALID } from "../locales.mjs";
 import { IOS_DEVICE, MAC_DEVICE, screenshotBase, IMAGE_FILE } from "../screenshots.mjs";
 import { SNAPSHOT_CATALOG, CREATIVE_SLOTS, mismatch, describeSize, matchFile } from "../assetCatalog.mjs";
 import { creativeBase } from "../creative.mjs";
@@ -326,59 +326,66 @@ export async function run(config) {
     return false;
   });
 
+  // A source folder that is itself an App Store code (`es-MX`) owns that folder: a localeMap entry that
+  // also names it (`es: ["es-ES", "es-MX"]`) fills it only while zdymak renders no set of its own.
+  const direct = new Set(localeDirs.filter((d) => VALID.has(d)));
   for (const source of [null, ...localeDirs]) {
     const from = source ? path.join(SRC, source) : SRC;
-    const asc = source ? toAsc(source, config.localeMap) : config.primaryLocale;
+    // One source folder can fill several listings: zdymak renders one Spanish set, and an app listed in
+    // both es-ES and es-MX maps `es` to both through localeMap.
+    const all = source ? toAscAll(source, config.localeMap) : [config.primaryLocale];
     // A code with no App Store language (Belarusian) is skipped — a locale with no folder falls back
     // to the primary listing, which is the intent.
-    if (!asc) { noLanguage.push(source); continue; }
+    if (!all.length) { noLanguage.push(source); continue; }
+    for (const asc of all.filter((a) => a === source || !direct.has(a))) {
 
-    // Only ship screenshots for a locale that also has LISTING TEXT. Uploading them alone makes fill
-    // create the App Store localization to attach them to, and a created localization stops falling
-    // back to the primary one — the store would show a page with pictures and an empty description
-    // instead of the primary text it shows today. Silent, and worse than not translating at all. When
-    // the copy for a locale lands, this picks its screenshots up with no edit here.
-    if (!fs.existsSync(path.join(config.metadataDir, asc))) { noListing.push(asc); continue; }
+      // Only ship screenshots for a locale that also has LISTING TEXT. Uploading them alone makes fill
+      // create the App Store localization to attach them to, and a created localization stops falling
+      // back to the primary one — the store would show a page with pictures and an empty description
+      // instead of the primary text it shows today. Silent, and worse than not translating at all. When
+      // the copy for a locale lands, this picks its screenshots up with no edit here.
+      if (!fs.existsSync(path.join(config.metadataDir, asc))) { noListing.push(asc); continue; }
 
-    for (const [root, slots] of [[APPLE, iosSlots], [APPLE_MAC, macSlots]]) {
-      for (const [slot, candidates] of Object.entries(slots)) {
-        if (candidates && typeof candidates === "object" && !Array.isArray(candidates)) {
-          const present = candidates.dirs.filter((d) => fs.existsSync(path.join(from, d)));
-          const labels = dirLabels(candidates.dirs);
-          for (const dir of present) {
-            const rank = candidates.dirs.indexOf(dir);
-            for (const img of imagesIn(path.join(from, dir))) {
-              plan.push({ from: path.join(from, dir, img), to: path.join(root, asc, mergedName(slot, rank, labels[rank], img, candidates.order)), store: "apple", slot });
-              carried.add(dir);
-              written.add(asc);
+      for (const [root, slots] of [[APPLE, iosSlots], [APPLE_MAC, macSlots]]) {
+        for (const [slot, candidates] of Object.entries(slots)) {
+          if (candidates && typeof candidates === "object" && !Array.isArray(candidates)) {
+            const present = candidates.dirs.filter((d) => fs.existsSync(path.join(from, d)));
+            const labels = dirLabels(candidates.dirs);
+            for (const dir of present) {
+              const rank = candidates.dirs.indexOf(dir);
+              for (const img of imagesIn(path.join(from, dir))) {
+                plan.push({ from: path.join(from, dir, img), to: path.join(root, asc, mergedName(slot, rank, labels[rank], img, candidates.order)), store: "apple", slot });
+                carried.add(dir);
+                written.add(asc);
+              }
             }
+            continue;
           }
+          const dir = pick(from, [candidates].flat());
+          if (!dir) continue;
+          for (const img of imagesIn(path.join(from, dir))) {
+            // fill selects the display type off the token before the first underscore, so an unprefixed
+            // copy would be a file it silently ignores, in the folder where it looks.
+            plan.push({ from: path.join(from, dir, img), to: path.join(root, asc, `${slot}_${img}`), store: "apple", slot });
+            carried.add(dir);
+            written.add(asc);
+          }
+        }
+      }
+
+      // The iOS 27 header and search asset, into `<creative.dir>/<locale>/header.<ext>` / `search.<ext>` —
+      // the layout `vydanne creative` reads. Held back with the screenshots above for a locale with no
+      // listing text, for the same reason and because `creative` places only on an existing localization.
+      const found = creativeFiles(from, zd, config, { videos: !source });
+      for (const [slot, files] of Object.entries(found)) {
+        if (files.length > 1) {
+          creativeConflicts.push(`${asc}: ${files.map((p) => path.relative(process.cwd(), p)).join(" and ")} — ${files.length === 2 ? "both" : "all"} for the ${CREATIVE_SLOTS[slot].label}, which holds one`);
           continue;
         }
-        const dir = pick(from, [candidates].flat());
-        if (!dir) continue;
-        for (const img of imagesIn(path.join(from, dir))) {
-          // fill selects the display type off the token before the first underscore, so an unprefixed
-          // copy would be a file it silently ignores, in the folder where it looks.
-          plan.push({ from: path.join(from, dir, img), to: path.join(root, asc, `${slot}_${img}`), store: "apple", slot });
-          carried.add(dir);
-          written.add(asc);
-        }
+        if (!files.length) continue;
+        plan.push({ from: files[0], to: path.join(CREATIVE, asc, `${slot}${path.extname(files[0]).toLowerCase()}`), store: "creative", slot });
+        creativeLocales.add(asc);
       }
-    }
-
-    // The iOS 27 header and search asset, into `<creative.dir>/<locale>/header.<ext>` / `search.<ext>` —
-    // the layout `vydanne creative` reads. Held back with the screenshots above for a locale with no
-    // listing text, for the same reason and because `creative` places only on an existing localization.
-    const found = creativeFiles(from, zd, config, { videos: !source });
-    for (const [slot, files] of Object.entries(found)) {
-      if (files.length > 1) {
-        creativeConflicts.push(`${asc}: ${files.map((p) => path.relative(process.cwd(), p)).join(" and ")} — ${files.length === 2 ? "both" : "all"} for the ${CREATIVE_SLOTS[slot].label}, which holds one`);
-        continue;
-      }
-      if (!files.length) continue;
-      plan.push({ from: files[0], to: path.join(CREATIVE, asc, `${slot}${path.extname(files[0]).toLowerCase()}`), store: "creative", slot });
-      creativeLocales.add(asc);
     }
   }
 

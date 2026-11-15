@@ -172,7 +172,8 @@ into localized art, and a `<source>/<lang>/` subdirectory overrides the shared s
 **`bridge` populates both screenshot layouts from zdymak's output.** It maps
 `store-assets/<locale>/<dir>/NN-name.png` onto the Apple and Play paths above: locale codes via the
 same `toAsc` table `fill` uses (`de` → `de-DE`; a code with no App Store language is skipped and falls
-back to the primary listing), the device-slot prefix prepended (`iphone69_01-fresh.png`; zdymak's
+back to the primary listing; a `localeMap` entry naming several codes, `es: ["es-ES", "es-MX"]`, fills each,
+unless zdymak renders a folder under that code itself), the device-slot prefix prepended (`iphone69_01-fresh.png`; zdymak's
 zdymak's four `appstore-iphone-duo-*` targets merged into one `iphoneduo_` set, order set by
 `bridge.apple.iphoneduo: { dirs, order: "display" | "scene" }`), the iOS 27 creative assets into
 `<creative.dir>/<locale>/header.*` / `search.*` (`appstore-header.png` or `appstore-universal.png` → header,

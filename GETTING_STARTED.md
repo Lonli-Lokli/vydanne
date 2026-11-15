@@ -220,7 +220,7 @@ export default {
 | `primaryLocale` | Your main App Store language. Any language you *don't* translate falls back to this, so it must be complete. |
 | `platforms` | `["IOS"]`, or `["IOS", "MAC_OS"]` if you ship a Mac app too. **Mac is a separate listing** — its text is not shared with iOS. |
 | `uiLocales` | Short language codes you publish in. vydanne converts them to Apple's codes (`de` → `de-DE`) and warns about any language the App Store doesn't offer. |
-| `localeMap` | Optional. Your code → Apple's code, for anything the built-in table doesn't cover (`{ "nb": "no" }`). Merged over the defaults, so list only your exceptions. |
+| `localeMap` | Optional. Your code → Apple's code, for anything the built-in table doesn't cover (`{ "nb": "no" }`). Merged over the defaults, so list only your exceptions. An entry may name several listings one language fills (`{ "es": ["es-ES", "es-MX"] }`): `bridge` copies that language's screenshots into each. |
 | `metadataDir` | Where your listing text lives. `fastlane/metadata` is the default. |
 | `screenshots` | Optional. Where your screenshots live, per platform: `{ IOS: "…", MAC_OS: "…" }`. Defaults to `fastlane/screenshots` and `fastlane/screenshots-macos`. |
 | `rating` | Age rating, e.g. `"4+"`. Anything other than `"4+"` also needs `ageRating` below. |

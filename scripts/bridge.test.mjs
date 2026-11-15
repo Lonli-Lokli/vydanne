@@ -200,3 +200,40 @@ test('the creative folder is rebuilt when zdymak makes creative assets, and left
   assert.equal(r.result, true, r.out);
   assert.deepEqual(listing(q.dir, 'fastlane', 'creative'), [path.join('en-GB', 'header.png')]);
 });
+
+// ── One source locale, several App Store listings ──────────────────────────────────────────────────
+
+test('a localeMap entry naming two App Store folders writes both — es reaches es-ES and es-MX', async () => {
+  const p = project({ config: { localeMap: { es: ['es-ES', 'es-MX'] } } });
+  for (const l of ['es-ES', 'es-MX']) fs.mkdirSync(path.join(p.config.metadataDir, l), { recursive: true });
+  await png(p.out('appstore-iphone-6.9', '01-home.png'), 1320, 2868);
+  await png(p.out('es', 'appstore-iphone-6.9', '01-home.png'), 1320, 2868);
+  const { result, out } = await bridgeIn(p.dir, p.config);
+  assert.equal(result, true, out);
+  for (const l of ['es-ES', 'es-MX']) {
+    assert.deepEqual(listing(p.dir, 'fastlane', 'screenshots', l), ['iphone69_01-home.png'], `${l}: ${out}`);
+  }
+});
+
+test('a source folder that is itself an App Store code wins its folder over a mapping that also names it', async () => {
+  const p = project({ config: { localeMap: { es: ['es-ES', 'es-MX'] } } });
+  for (const l of ['es-ES', 'es-MX']) fs.mkdirSync(path.join(p.config.metadataDir, l), { recursive: true });
+  await png(p.out('appstore-iphone-6.9', '01-home.png'), 1320, 2868);
+  await png(p.out('es', 'appstore-iphone-6.9', '01-home.png'), 1320, 2868);
+  await png(p.out('es-MX', 'appstore-iphone-6.9', '01-mx.png'), 1320, 2868);
+  const { result, out } = await bridgeIn(p.dir, p.config);
+  assert.equal(result, true, out);
+  assert.deepEqual(listing(p.dir, 'fastlane', 'screenshots', 'es-ES'), ['iphone69_01-home.png']);
+  assert.deepEqual(listing(p.dir, 'fastlane', 'screenshots', 'es-MX'), ['iphone69_01-mx.png']);
+});
+
+test('resolveLocales keeps the first folder as supported, lists every one under targets, and flags a bad one', async () => {
+  const { resolveLocales, toAsc } = await import('../src/locales.mjs');
+  const r = resolveLocales(['en', 'es'], { es: ['es-ES', 'es-MX'] });
+  assert.deepEqual(r.supported, { en: 'en-US', es: 'es-ES' });
+  assert.deepEqual(r.targets, { en: ['en-US'], es: ['es-ES', 'es-MX'] });
+  assert.equal(toAsc('es', { es: ['es-ES', 'es-MX'] }), 'es-ES');
+  const bad = resolveLocales(['es'], { es: ['es-ES', 'es-XX'] });
+  assert.deepEqual(bad.invalid, ['es -> es-XX']);
+  assert.deepEqual(bad.targets, { es: ['es-ES'] });
+});

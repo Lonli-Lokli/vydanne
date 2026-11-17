@@ -11,6 +11,10 @@ written: 2026-10-26
 
 owner, 2026-10-26, session b26ca605-a4e8-4a96-9fd2-e03b58a670f2
 
+> Agree. When we will have middleware for vydanne implemented we can pass run all tests before actual commit
+
+owner, 2026-11-05, session 6a969989-9d2d-4cd7-a2c4-bc5c1c930625 (agreeing that the full test run before an upload should be enforced by a tool, not only written in a skill)
+
 ## Why
 Asilak moved its Gradle checks (detekt, the shared-core tests, the Android classpath-skew check) off the pre-push hook
 and into CI, where every release workflow waits for them. But a local `npx vydanne prerelease --store google --apply`
@@ -39,6 +43,10 @@ through vydanne, so this is a vydanne feature, not part of asilak's work.
 - Asilak's checks now live in its checks.yml, and each release workflow's `release` job needs them [file ~/sources/asilak/.github/workflows/checks.yml] [file ~/sources/asilak/.github/workflows/release-android.yml]
 - Asilak's local upload path is vydanne itself, binary included [file ~/.claude/projects/-Users-volha-sources-asilak/memory/store-upload-path.md]
 - GitHub Actions refused to start asilak's CI run 40416944628 on 2026-10-26 ("recent account payments have failed or your spending limit needs to be increased"), so a local upload is the only path that works now [command gh run view 40416944628 -R dia-olka/asilak]
+- Since niva/android-host-tests-prefs (2026-11-05) every portfolio app splits its tests into an everyday suite and a deep suite (`*DeepTest` classes, `-Pgames.suite=deep|all`), and `npm run test:all` runs every test on every target with no time guard [file ~/sources/gulnya/gradle/tests.gradle.kts]
+- The release-gates skill names `npm run test:all` through the heavy queue as the first gate before any upload, but only as a written rule: no upload command runs it or refuses without it [file ~/sources/gulnya/claude/skills/release-gates/SKILL.md:11-17]
+- A full run is long on this Mac: Vinto's deep suites took 10 min (JVM) and 11.5 min (iOS) of Gradle time, KatyaFM's deep 12.5 min, Niva's deep 12 min [file ~/sources/game-minesweeper/kirunak/tasks/android-host-tests-prefs/steps/S-18/after-exits.txt] [file ~/sources/game-minesweeper/kirunak/tasks/android-host-tests-prefs/progress.md]
+- KatyaFM's in-app purchase review image is now written by a deep test, so `store:iap` needs the deep suite to have run first [file ~/sources/game-minesweeper/kirunak/tasks/android-host-tests-prefs/progress.md, the S-17 13:02 line]
 - Asilak is not a kirunak repo, so its own entry cannot be a draft here [command grep -n "name: 'asilak'" ~/sources/gulnya/kirunak/workspace.mjs]
 
 ## Questions
@@ -80,5 +88,9 @@ through vydanne, so this is a vydanne feature, not part of asilak's work.
    Proposed: yes; the only text is the tool's English messages and its docs.
 19. Done means: `scripts` in CONFIG_KEYS, VydanneConfig, README's "Your config, field by field" (with a section beside "Middleware") and SKILL.md, check-docs, check-types and check-config passing, and a node:test suite in `verify` that proves each rule above against the fake store. That covers: a failing `prepublish` refuses an `--apply` prerelease before any request; a passing one lets it through; a dry run runs nothing and prints the plan; `stores` narrows; `push` runs its hooks once; a post-hook failure says the write happened; tracked changes refuse; the waiver needs a reason; hooks run in the config's folder; `runCommand` runs them too. Yes or no?
    Proposed: yes; each case is a test that fails without the change.
-20. The plan: 1, the hooks module and its tests; 2, the wiring in bin/vydanne.mjs and runCommand; 3, docs, types and guards; 4, a minor release (1.5.0) from a tag, once the owner says yes at the time, since an npm release is outward-facing. Yes, or another order?
+20. Once a vydanne release has `prepublish`, should each portfolio app's config put its full test run there (`npm run test:all` through the heavy queue), so an `--apply` refuses when any test fails, the deep ones included?
+   Proposed: yes, the owner's word of 2026-11-05. It is a follow-up in each app (a draft per app, or one task across them), since vydanne stays generic and knows nothing of the portfolio's suites.
+21. A full run takes about 15-30 minutes per app, and one release often runs several writes (Apple prerelease, then Play, then the IAP text). Should the app's `prepublish` command keep a pass record for the commit, so a second write on the same clean commit skips the rerun?
+   Proposed: yes, the shape legacy-gate's and ios-smoke's receipts already have (same commit, no tracked change); the record belongs to the app's command, not to vydanne, which only runs it.
+22. The plan: 1, the hooks module and its tests; 2, the wiring in bin/vydanne.mjs and runCommand; 3, docs, types and guards; 4, a minor release (1.5.0) from a tag, once the owner says yes at the time, since an npm release is outward-facing. Yes, or another order?
    Proposed: yes; it is one bounded change, so no step needs Fable, and the release waits for the owner.

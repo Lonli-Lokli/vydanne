@@ -172,7 +172,8 @@ into localized art, and a `<source>/<lang>/` subdirectory overrides the shared s
 **`bridge` populates both screenshot layouts from zdymak's output.** It maps
 `store-assets/<locale>/<dir>/NN-name.png` onto the Apple and Play paths above: locale codes via the
 same `toAsc` table `fill` uses (`de` → `de-DE`; a code with no App Store language is skipped and falls
-back to the primary listing), the device-slot prefix prepended (`iphone69_01-fresh.png`; zdymak's
+back to the primary listing; a `localeMap` entry naming several codes, `es: ["es-ES", "es-MX"]`, fills each,
+unless zdymak renders a folder under that code itself), the device-slot prefix prepended (`iphone69_01-fresh.png`; zdymak's
 zdymak's four `appstore-iphone-duo-*` targets merged into one `iphoneduo_` set, order set by
 `bridge.apple.iphoneduo: { dirs, order: "display" | "scene" }`), the iOS 27 creative assets into
 `<creative.dir>/<locale>/header.*` / `search.*` (`appstore-header.png` or `appstore-universal.png` → header,
@@ -314,7 +315,9 @@ it to an **internal** group. External groups are REFUSED — they need Beta App 
 another name — and App Store review is never submitted, mirroring the Play side refusing `production`.
 Before any network call `prerelease` checks the build's own id against the config: the `.aab` manifest's package must equal `google.packageName`, and the `.ipa`'s `CFBundleIdentifier` must equal `bundleId`. A build with another id (a debug, staging or other variant of the app) or one whose id cannot be read is REFUSED, and no flag or env var skips it.
 It then points the version being prepared AT that build, so the fix-and-re-upload loop is one command:
-re-running re-points (the relationship holds one build), while a version that is `IN_REVIEW` or
+re-running re-points (the relationship holds one build). A build number Apple already holds is REFUSED
+(ASC cannot tell the same binary from a new one); `VYDANNE_ATTACH_HELD=1` says it is the same binary
+(a re-run after `withdraw`) and attaches the held build. A version that is `IN_REVIEW` or
 `READY_FOR_SALE` is left alone, since re-pointing it would mean withdrawing a submission.
 
 With `--store google` it uploads an `.aab` to a **closed testing track** with release notes, inside one
@@ -332,7 +335,8 @@ at Play's 500 chars; the App Store's What's New is `<locale>/release_notes/<vers
 knowable in advance (derived from the commit count, say): after a real publish vydanne renames it to
 `<versionCode>.txt` so the next release can't inherit it, and a `default.txt` fallback is WARNED rather
 than silent. The versionCode is read out of the `.aab` locally and the changelog resolution reported
-BEFORE the upload; re-uploading a used code fails loudly instead of silently replacing. DRY by default;
+BEFORE the upload; a used code is reused only when Play holds this very bundle (same sha256, a promotion
+to another track), and a different bundle carrying it is refused. DRY by default;
 `--apply` publishes.
 
 `inspect --store google` also reports **which build is on which track** — versionCode, version
@@ -463,7 +467,7 @@ through that client. **A new command that touches the store must be marked `writ
 **Env toggles:** `VYDANNE_CONFIG` · `VYDANNE_SKIP_METADATA` / `VYDANNE_SKIP_SCREENSHOTS` (fill) ·
 `VYDANNE_REPLACE` (fill screenshots + previews + creative: replace populated slots) ·
 `VYDANNE_DUO_OPTIONAL` (preflight from April 2027: the build is on an SDK older than iOS 27.1) · `VYDANNE_VERSION` (prepare) ·
-`VYDANNE_IPA` / `VYDANNE_AAB` / `VYDANNE_TRACK` / `VYDANNE_RELEASE_NAME` (prerelease) ·
+`VYDANNE_IPA` / `VYDANNE_AAB` / `VYDANNE_TRACK` / `VYDANNE_RELEASE_NAME` / `VYDANNE_ATTACH_HELD` (prerelease) ·
 `VYDANNE_FLATTEN=<png>` (iap) · `VYDANNE_A11Y_PUBLISH` (accessibility) · `VYDANNE_ALLOW_CROSS_STORE`
 (one run past the cross-store lint) · `VYDANNE_COMMIT=1` (legacy alias for `--apply`; prefer the flag).
 

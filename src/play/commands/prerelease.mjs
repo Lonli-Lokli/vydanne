@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { green, yellow, red } from "../../util.mjs";
@@ -24,7 +25,8 @@ import { PRODUCTION, describeTracks, parseTracks } from "../tracks.mjs";
  * without buying. Closed/open testers must purchase it like anyone else.
  *
  * Play assigns the versionCode from the bundle's own manifest, so build numbering stays with the build,
- * and re-uploading the same code fails loudly rather than silently replacing a binary.
+ * and a code Play already holds is reused only for the very bundle Play holds (by sha256): a different
+ * bundle carrying it is refused loudly rather than silently replaced by the old one.
  *
  * Everything happens inside one edit transaction: nothing is live until commit, and any throw leaves the
  * edit uncommitted — i.e. every track untouched. Several tracks (`google.track: ["alpha", "internal"]`,
@@ -81,8 +83,9 @@ export async function run(config, client) {
   try {
     // Upload, or REUSE. Play rejects a versionCode it already holds, which is the right answer for an
     // accidental re-upload but wrong for the common case of promoting a build you already pushed to one
-    // testing track onto another. The API names the code in its refusal, so take it and carry on — the
-    // bytes are already up there, and a bundle is immutable, so reusing it can't diverge from the file.
+    // testing track onto another. The API names the code in its refusal; reuse that bundle only when it
+    // IS this file (Play lists each bundle's sha256). A different bundle carrying a used code is refused:
+    // reusing it would put the OLD binary on the track while this one never reaches Play.
     let versionCode;
     try {
       const bundle = await client.uploadBundle(editId, aab);
@@ -93,7 +96,20 @@ export async function run(config, client) {
       const used = /Version code (\d+) has already been used/.exec(e.message);
       if (!used) throw e;
       versionCode = Number(used[1]);
-      console.log(yellow(`  versionCode ${versionCode} already uploaded — reusing that bundle`));
+      const same = await heldIsThisBundle(client, editId, versionCode, aab);
+      if (same === false) {
+        throw new Error(
+          `refusing: versionCode ${versionCode} is already on Play, and it is a different bundle (sha256 differs).\n` +
+            "  Bump versionCode and rebuild: reusing it would put the old bundle on the track, never this one.",
+        );
+      }
+      if (same == null && process.env.VYDANNE_ATTACH_HELD !== "1") {
+        throw new Error(
+          `refusing: versionCode ${versionCode} is already on Play, and Play did not list its bundle to compare.\n` +
+            "  If this IS the bundle already uploaded, re-run with VYDANNE_ATTACH_HELD=1; otherwise bump versionCode.",
+        );
+      }
+      console.log(yellow(`  versionCode ${versionCode} already uploaded${same ? " (the same bundle)" : " (VYDANNE_ATTACH_HELD=1)"} — reusing that bundle`));
     }
 
     if (declared != null && declared !== versionCode) {
@@ -155,6 +171,18 @@ export async function run(config, client) {
     console.error(red(`prerelease: ${e.message}`));
     return false;
   }
+}
+
+/**
+ * Whether the bundle Play holds under [versionCode] is the file at [aab]: true or false by sha256, null
+ * when Play does not list it (then nothing can be said, and the caller refuses unless told otherwise).
+ */
+async function heldIsThisBundle(client, editId, versionCode, aab) {
+  const { status, json } = await client.listBundles(editId);
+  const held = status < 300 ? (json.bundles || []).find((b) => Number(b.versionCode) === versionCode) : null;
+  if (!held?.sha256) return null;
+  const mine = crypto.createHash("sha256").update(fs.readFileSync(aab)).digest("hex");
+  return held.sha256.toLowerCase() === mine;
 }
 
 /** `google.aab` may be a file or a directory; a directory takes its newest .aab. */

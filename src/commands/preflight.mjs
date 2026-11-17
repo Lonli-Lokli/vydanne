@@ -86,7 +86,7 @@ export async function run(config, client) {
       problems.push(`${platform}: demoAccountRequired is true but no demo account is set — Apple rejects this`);
     }
     const locs = await client.versionLocalizations(v.id);
-    const ascLocales = [...new Set([config.primaryLocale, ...Object.values(res.supported)])];
+    const ascLocales = [...new Set([config.primaryLocale, ...Object.values(res.targets ?? res.supported).flat()])];
 
     for (const code of ascLocales) {
       const loc = locs.find((l) => l.attributes.locale === code);

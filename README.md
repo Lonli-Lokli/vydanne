@@ -159,7 +159,7 @@ Every field is optional except `bundleId` and `primaryLocale`. The ones you reac
 | Field | What it's for |
 |---|---|
 | `screenshots` | Where your screenshots live, per platform. Defaults to `fastlane/screenshots` + `fastlane/screenshots-macos`. |
-| `localeMap` | Your language codes → Apple's, for anything the built-in table misses (`{ nb: "no" }`). |
+| `localeMap` | Your language codes → Apple's, for anything the built-in table misses (`{ nb: "no" }`). An entry may name several listings one language fills (`{ es: ["es-ES", "es-MX"] }`): `bridge` copies that language's screenshots into each. |
 | `ageRating` | The content descriptors behind any rating above `4+`. Apple computes the band from them. |
 | `reviewContact` | `{ demoAccountRequired }` — otherwise inferred from whether `review_information/demo_user.txt` exists. |
 | `export` | Export-compliance details. `algorithms` + `statement` are required for `encryption: "standard"`. |
@@ -437,8 +437,11 @@ out — to `xcrun altool`, which ships with Xcode and authenticates from the sam
 checks up front. The archive is validated before it is uploaded, so the common refusals (bad
 entitlements, missing icons, a version Apple already holds) cost seconds rather than a full transfer.
 
-Build numbers come from the archive's own `CFBundleVersion` — re-uploading one Apple already holds
-fails loudly instead of quietly replacing a binary.
+Build numbers come from the archive's own `CFBundleVersion`. An archive carrying a number Apple already
+holds is refused before any transfer, instead of the held build being attached in its place: App Store
+Connect keeps no hash to tell the same binary from a new one, so after a `withdraw`, when the archive
+IS the held build, `VYDANNE_ATTACH_HELD=1` attaches it. On Play a used versionCode is reused only when
+Play's copy has this bundle's sha256 (promoting a build to another track); a different bundle is refused.
 
 It also **points the version you are preparing at the build it just uploaded**, which is the loop
 this command exists for:
